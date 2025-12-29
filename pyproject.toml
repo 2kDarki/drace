@@ -41,7 +41,7 @@ classifiers = [
 drace = "drace.cli:main"
 
 [tool.setuptools]
-packages = {find = {include = ["drace/**"]}}
+packages = {find = {include = ["drace*"]}}
 
 [project.urls]
 Homepage = "https://github.com/2kDarki/drace"
