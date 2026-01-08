@@ -1,15 +1,10 @@
-"""
-Provide the Reporter class.
-"""
-
-import re
+"""Provide the Reporter class."""
 import sys
+import re
 
 
 class Reporter:
-    """
-    Formats the results of pyflakes checks to users.
-    """
+    """Formats the results of pyflakes checks to users."""
 
     def __init__(self, warningStream, errorStream):
         """
@@ -51,10 +46,8 @@ class Reporter:
         @param text: The source code containing the syntax error.
         @ptype text: C{unicode}
         """
-        if text is None:
-            line = None
-        else:
-            line = text.splitlines()[-1]
+        if text is None: line = None
+        else: line = text.splitlines()[-1]
 
         # lineno might be None if the error was during tokenization
         # lineno might be 0 if the error came from stdin

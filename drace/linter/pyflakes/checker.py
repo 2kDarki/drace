@@ -5,25 +5,34 @@ Implement the central Checker class.
 Also, it models the Bindings and Scopes.
 """
 import __future__
-import builtins
-import ast
+
+# ======================= STANDARDS ========================
 import collections
 import contextlib
-import doctest
 import functools
+import builtins
+import warnings
+import doctest
+import string
+import ast
+import sys
 import os
 import re
-import string
-import sys
-import warnings
 
-from pyflakes import messages
+# ========================= LOCALS =========================
+from . import messages
 
-PYPY = hasattr(sys, 'pypy_version_info')
-
-builtin_vars = dir(builtins)
-
+PYPY                = hasattr(sys, 'pypy_version_info')
+builtin_vars        = dir(builtins)
 parse_format_string = string.Formatter().parse
+
+MAPPING_KEY_RE     = re.compile(r'\(([^()]*)\)')
+CONVERSION_FLAG_RE = re.compile('[#0+ -]*')
+WIDTH_RE           = re.compile(r'(?:\*|\d*)')
+PRECISION_RE       = re.compile(r'(?:\.(?:\*|\d*))?')
+LENGTH_RE          = re.compile('[hlL]?')
+# https://docs.python.org/3/library/stdtypes.html#old-string-formatting
+VALID_CONVERSIONS = frozenset('diouxXeEfFgGcrsa%')
 
 
 def getAlternatives(n):
@@ -67,15 +76,6 @@ def _is_name_or_attr(node, name):  # type: (ast.AST, str) -> bool
     )
 
 
-MAPPING_KEY_RE = re.compile(r'\(([^()]*)\)')
-CONVERSION_FLAG_RE = re.compile('[#0+ -]*')
-WIDTH_RE = re.compile(r'(?:\*|\d*)')
-PRECISION_RE = re.compile(r'(?:\.(?:\*|\d*))?')
-LENGTH_RE = re.compile('[hlL]?')
-# https://docs.python.org/3/library/stdtypes.html#old-string-formatting
-VALID_CONVERSIONS = frozenset('diouxXeEfFgGcrsa%')
-
-
 def _must_match(regex, string, pos):
     match = regex.match(string, pos)
     assert match is not None
@@ -90,14 +90,13 @@ def parse_percent_format(s):
 
     def _parse_inner():
         string_start = 0
-        string_end = 0
-        in_fmt = False
+        string_end   = 0
+        in_fmt       = False
 
         i = 0
         while i < len(s):
             if not in_fmt:
-                try:
-                    i = s.index('%', i)
+                try: i = s.index('%', i)
                 except ValueError:  # no more % fields!
                     yield s[string_start:], None
                     return
@@ -109,21 +108,24 @@ def parse_percent_format(s):
                 key_match = MAPPING_KEY_RE.match(s, i)
                 if key_match:
                     key = key_match.group(1)
-                    i = key_match.end()
-                else:
-                    key = None
+                    i   = key_match.end()
+                else: key = None
 
-                conversion_flag_match = _must_match(CONVERSION_FLAG_RE, s, i)
-                conversion_flag = conversion_flag_match.group() or None
+                conversion_flag_match = _must_match(
+                                        CONVERSION_FLAG_RE,
+                                        s, i)
+                conversion_flag = conversion_flag_match\
+                                 .group() or None
                 i = conversion_flag_match.end()
 
                 width_match = _must_match(WIDTH_RE, s, i)
-                width = width_match.group() or None
-                i = width_match.end()
+                width       = width_match.group() or None
+                i           = width_match.end()
 
-                precision_match = _must_match(PRECISION_RE, s, i)
+                precision_match = _must_match(PRECISION_RE,
+                                  s, i)
                 precision = precision_match.group() or None
-                i = precision_match.end()
+                i         = precision_match.end()
 
                 # length modifier is ignored
                 i = _must_match(LENGTH_RE, s, i).end()
@@ -137,7 +139,7 @@ def parse_percent_format(s):
                 fmt = (key, conversion_flag, width, precision, conversion)
                 yield s[string_start:string_end], fmt
 
-                in_fmt = False
+                in_fmt       = False
                 string_start = i
 
         if in_fmt:
@@ -156,8 +158,7 @@ class _FieldsOrder(dict):
             key_first = 'iter'.find
         elif 'generators' in fields:
             key_first = 'generators'.find
-        else:
-            key_first = 'value'.find
+        else: key_first = 'value'.find
         return tuple(sorted(fields, key=key_first, reverse=True))
 
     def __missing__(self, node_class):
@@ -216,9 +217,9 @@ class Binding:
     """
 
     def __init__(self, name, source):
-        self.name = name
+        self.name   = name
         self.source = source
-        self.used = False
+        self.used   = False
 
     def __str__(self):
         return self.name
@@ -272,8 +273,7 @@ class VariableKey:
 
     @ivar item: The variable AST object.
     """
-    def __init__(self, item):
-        self.name = item.id
+    def __init__(self, item): self.name = item.id
 
     def __eq__(self, compare):
         return (
@@ -281,8 +281,7 @@ class VariableKey:
             compare.name == self.name
         )
 
-    def __hash__(self):
-        return hash(self.name)
+    def __hash__(self): return hash(self.name)
 
 
 class Importation(Definition):
@@ -295,7 +294,7 @@ class Importation(Definition):
     """
 
     def __init__(self, name, source, full_name=None):
-        self.fullName = full_name or name
+        self.fullName  = full_name or name
         self.redefined = []
         super().__init__(name, source)
 
@@ -314,15 +313,13 @@ class Importation(Definition):
         """Generate a source statement equivalent to the import."""
         if self._has_alias():
             return f'import {self.fullName} as {self.name}'
-        else:
-            return 'import %s' % self.fullName
+        else: return 'import %s' % self.fullName
 
     def __str__(self):
         """Return import full name with alias."""
         if self._has_alias():
             return self.fullName + ' as ' + self.name
-        else:
-            return self.fullName
+        else: return self.fullName
 
 
 class SubmoduleImportation(Importation):
@@ -354,8 +351,7 @@ class SubmoduleImportation(Importation):
             return self.fullName == other.fullName
         return super().redefines(other)
 
-    def __str__(self):
-        return self.fullName
+    def __str__(self): return self.fullName
 
     @property
     def source_statement(self):
@@ -365,13 +361,12 @@ class SubmoduleImportation(Importation):
 class ImportationFrom(Importation):
 
     def __init__(self, name, source, module, real_name=None):
-        self.module = module
+        self.module    = module
         self.real_name = real_name or name
 
         if module.endswith('.'):
             full_name = module + self.real_name
-        else:
-            full_name = module + '.' + self.real_name
+        else: full_name = module + '.' + self.real_name
 
         super().__init__(name, source, full_name)
 
@@ -379,8 +374,7 @@ class ImportationFrom(Importation):
         """Return import full name with alias."""
         if self.real_name != self.name:
             return self.fullName + ' as ' + self.name
-        else:
-            return self.fullName
+        else: return self.fullName
 
     @property
     def source_statement(self):
@@ -397,7 +391,7 @@ class StarImportation(Importation):
         super().__init__('*', source)
         # Each star importation needs a unique name, and
         # may not be the module name otherwise it will be deemed imported
-        self.name = name + '.*'
+        self.name     = name + '.*'
         self.fullName = name
 
     @property
@@ -408,8 +402,7 @@ class StarImportation(Importation):
         # When the module ends with a ., avoid the ambiguous '..*'
         if self.fullName.endswith('.'):
             return self.source_statement
-        else:
-            return self.name
+        else: return self.name
 
 
 class FutureImportation(ImportationFrom):
@@ -460,12 +453,10 @@ class Annotation(Binding):
         return False
 
 
-class FunctionDefinition(Definition):
-    pass
+class FunctionDefinition(Definition): pass
 
 
-class ClassDefinition(Definition):
-    pass
+class ClassDefinition(Definition): pass
 
 
 class ExportBinding(Binding):
@@ -486,8 +477,7 @@ class ExportBinding(Binding):
     def __init__(self, name, source, scope):
         if '__all__' in scope and isinstance(source, ast.AugAssign):
             self.names = list(scope['__all__'].names)
-        else:
-            self.names = []
+        else: self.names = []
 
         def _add_to_names(container):
             for node in container.elts:
@@ -518,7 +508,7 @@ class ExportBinding(Binding):
 
 
 class Scope(dict):
-    importStarred = False       # set to True when import * is found
+    importStarred = False  # set to True when import * is found
 
     def __repr__(self):
         scope_cls = self.__class__.__name__
@@ -570,17 +560,15 @@ class FunctionScope(Scope):
                 yield name, binding
 
 
-class TypeScope(Scope):
-    pass
+class TypeScope(Scope): pass
 
 
-class GeneratorScope(Scope):
-    pass
+class GeneratorScope(Scope): pass
 
 
 class ModuleScope(Scope):
     """Scope for a module."""
-    _futures_allowed = True
+    _futures_allowed            = True
     _annotations_future_enabled = False
 
 
@@ -686,9 +674,9 @@ def is_typing_overload(value, scope_stack):
 
 
 class AnnotationState:
-    NONE = 0
+    NONE   = 0
     STRING = 1
-    BARE = 2
+    BARE   = 2
 
 
 def in_annotation(func):
@@ -722,8 +710,8 @@ class Checker:
         ast.DictComp: GeneratorScope,
     }
 
-    nodeDepth = 0
-    offset = None
+    nodeDepth      = 0
+    offset         = None
     _in_annotation = AnnotationState.NONE
 
     builtIns = set(builtin_vars).union(_MAGIC_GLOBALS)
@@ -732,22 +720,23 @@ class Checker:
         builtIns.update(_customBuiltIns.split(','))
     del _customBuiltIns
 
-    def __init__(self, tree, filename='(none)', builtins=None,
-                 withDoctest='PYFLAKES_DOCTEST' in os.environ, file_tokens=()):
+    def __init__(self, tree, filename='(none)',
+                 builtins=None,
+                 withDoctest='PYFLAKES_DOCTEST' in
+                 os.environ, file_tokens=()):
         self._nodeHandlers = {}
-        self._deferred = collections.deque()
-        self.deadScopes = []
-        self.messages = []
-        self.filename = filename
+        self._deferred     = collections.deque()
+        self.deadScopes    = []
+        self.messages      = []
+        self.filename      = filename
         if builtins:
             self.builtIns = self.builtIns.union(builtins)
-        self.withDoctest = withDoctest
+        self.withDoctest    = withDoctest
         self.exceptHandlers = [()]
-        self.root = tree
+        self.root           = tree
 
         self.scopeStack = []
-        try:
-            scope_tp = Checker._ast_node_scope[type(tree)]
+        try: scope_tp = Checker._ast_node_scope[type(tree)]
         except KeyError:
             raise RuntimeError('No scope implemented for the node %r' % tree)
 
@@ -824,8 +813,7 @@ class Checker:
     @contextlib.contextmanager
     def in_scope(self, cls):
         self.scopeStack.append(cls())
-        try:
-            yield
+        try: yield
         finally:
             self.deadScopes.append(self.scopeStack.pop())
 
@@ -918,8 +906,7 @@ class Checker:
                 )
         ):
             return None
-        if lnode is rnode:
-            return lnode
+        if lnode is rnode: return lnode
 
         if (lnode._pyflakes_depth > rnode._pyflakes_depth):
             return self.getCommonAncestor(lnode._pyflakes_parent, rnode, stop)
@@ -951,7 +938,8 @@ class Checker:
 
     def differentForks(self, lnode, rnode):
         """True, if lnode and rnode are located on different forks of IF/TRY"""
-        ancestor = self.getCommonAncestor(lnode, rnode, self.root)
+        ancestor = self.getCommonAncestor(lnode, rnode,
+                   self.root)
         parts = getAlternatives(ancestor)
         if parts:
             for items in parts:
@@ -969,8 +957,7 @@ class Checker:
         """
         # assert value.source in (node, node._pyflakes_parent):
         for scope in self.scopeStack[::-1]:
-            if value.name in scope:
-                break
+            if value.name in scope: break
         existing = scope.get(value.name)
 
         if (existing and not isinstance(existing, Builtin) and
@@ -1016,8 +1003,7 @@ class Checker:
                 else:
                     # it may be a re-assignment to an already existing name
                     scope.setdefault(value.name, value)
-            else:
-                self.scope[value.name] = value
+            else: self.scope[value.name] = value
 
     def _unknown_handler(self, node):
         # this environment variable configures whether to error on unknown
@@ -1032,12 +1018,10 @@ class Checker:
         # needed).
         if os.environ.get('PYFLAKES_ERROR_UNKNOWN'):
             raise NotImplementedError(f'Unexpected type: {type(node)}')
-        else:
-            self.handleChildren(node)
+        else: self.handleChildren(node)
 
     def getNodeHandler(self, node_class):
-        try:
-            return self._nodeHandlers[node_class]
+        try: return self._nodeHandlers[node_class]
         except KeyError:
             nodeType = node_class.__name__.upper()
         self._nodeHandlers[node_class] = handler = getattr(
@@ -1056,7 +1040,7 @@ class Checker:
         # - generators
         # - type annotations (for generics, etc.)
         can_access_class_vars = None
-        importStarred = None
+        importStarred         = None
 
         # try enclosing function scopes and global scope
         for scope in self.scopeStack[-1::-1]:
@@ -1089,12 +1073,9 @@ class Checker:
                 if isinstance(n, Importation) and n._has_alias():
                     try:
                         scope[n.fullName].used = (self.scope, node)
-                    except KeyError:
-                        pass
-            except KeyError:
-                pass
-            else:
-                return
+                    except KeyError: pass
+            except KeyError: pass
+            else: return
 
             importStarred = importStarred or scope.importStarred
 
@@ -1172,7 +1153,6 @@ class Checker:
         self.addBinding(node, binding)
 
     def handleNodeDelete(self, node):
-
         def on_conditional_branch():
             """
             Return `True` if node is part of a conditional body.
@@ -1185,8 +1165,7 @@ class Checker:
             return False
 
         name = getNodeName(node)
-        if not name:
-            return
+        if not name: return
 
         if on_conditional_branch():
             # We cannot predict if this conditional branch is going to
@@ -1199,18 +1178,15 @@ class Checker:
         if isinstance(self.scope, FunctionScope) and name in self.scope.globals:
             self.scope.globals.remove(name)
         else:
-            try:
-                del self.scope[name]
+            try: del self.scope[name]
             except KeyError:
                 self.report(messages.UndefinedName, node, name)
 
     @contextlib.contextmanager
     def _enter_annotation(self, ann_type=AnnotationState.BARE):
         orig, self._in_annotation = self._in_annotation, ann_type
-        try:
-            yield
-        finally:
-            self._in_annotation = orig
+        try: yield
+        finally: self._in_annotation = orig
 
     @property
     def _in_postponed_annotation(self):
@@ -1251,12 +1227,10 @@ class Checker:
                 isinstance(node.value.value, str)
         ):
             return node.value.value, node.lineno - 1
-        else:
-            return None, None
+        else: return None, None
 
     def handleNode(self, node, parent):
-        if node is None:
-            return
+        if node is None: return
         if self.offset and getattr(node, 'lineno', None) is not None:
             node.lineno += self.offset[0]
             node.col_offset += self.offset[1]
@@ -1268,13 +1242,12 @@ class Checker:
         ):
             self.futuresAllowed = False
         self.nodeDepth += 1
-        node._pyflakes_depth = self.nodeDepth
+        node._pyflakes_depth  = self.nodeDepth
         node._pyflakes_parent = parent
         try:
             handler = self.getNodeHandler(node.__class__)
             handler(node)
-        finally:
-            self.nodeDepth -= 1
+        finally: self.nodeDepth -= 1
 
     _getDoctestExamples = doctest.DocTestParser().get_examples
 
@@ -1283,16 +1256,16 @@ class Checker:
             (docstring, node_lineno) = self.getDocstring(node.body[0])
             examples = docstring and self._getDoctestExamples(docstring)
         except (ValueError, IndexError):
-            # e.g. line 6 of the docstring for <string> has inconsistent
+            # e.g. line 6 of the docstring for <string> has
+            # inconsistent
             # leading whitespace: ...
             return
-        if not examples:
-            return
+        if not examples: return
 
         # Place doctest in module scope
-        saved_stack = self.scopeStack
+        saved_stack     = self.scopeStack
         self.scopeStack = [self.scopeStack[0]]
-        node_offset = self.offset or (0, 0)
+        node_offset     = self.offset or (0, 0)
         with self.in_scope(DoctestScope):
             if '_' not in self.scopeStack[0]:
                 self.addBinding(None, Builtin('_'))
@@ -1312,11 +1285,9 @@ class Checker:
 
     @in_string_annotation
     def handleStringAnnotation(self, s, node, ref_lineno, ref_col_offset, err):
-        try:
-            tree = ast.parse(s)
+        try: tree = ast.parse(s)
         except SyntaxError:
-            self.report(err, node, s)
-            return
+            self.report(err, node, s); return
 
         body = tree.body
         if len(body) != 1 or not isinstance(body[0], ast.Expr):
@@ -1355,21 +1326,19 @@ class Checker:
             ))
         elif self.annotationsFutureEnabled or sys.version_info >= (3, 14):
             self.handle_annotation_always_deferred(annotation, node)
-        else:
-            self.handleNode(annotation, node)
+        else: self.handleNode(annotation, node)
 
-    def ignore(self, node):
-        pass
+    def ignore(self, node): pass
 
     # "stmt" type nodes
-    DELETE = FOR = ASYNCFOR = WHILE = WITH = WITHITEM = ASYNCWITH = \
-        EXPR = ASSIGN = handleChildren
+    DELETE = FOR = ASYNCFOR = WHILE = WITH = WITHITEM = \
+             ASYNCWITH = EXPR = ASSIGN = handleChildren
 
     PASS = ignore
 
     # "expr" type nodes
-    BOOLOP = UNARYOP = SET = ATTRIBUTE = STARRED = NAMECONSTANT = \
-        NAMEDEXPR = handleChildren
+    BOOLOP = UNARYOP = SET = ATTRIBUTE = STARRED = \
+             NAMECONSTANT = NAMEDEXPR = handleChildren
 
     def SUBSCRIPT(self, node):
         if _is_name_or_attr(node.value, 'Literal'):
@@ -1387,8 +1356,7 @@ class Checker:
                     isinstance(node.slice.value, ast.Tuple)
             ):
                 slice_tuple = node.slice.value
-            else:
-                slice_tuple = None
+            else: slice_tuple = None
 
             # not a multi-arg `Annotated`
             if slice_tuple is None or len(slice_tuple.elts) < 2:
@@ -1406,8 +1374,7 @@ class Checker:
             if _is_any_typing_member(node.value, self.scopeStack):
                 with self._enter_annotation():
                     self.handleChildren(node)
-            else:
-                self.handleChildren(node)
+            else: self.handleChildren(node)
 
     def _handle_string_dot_format(self, node):
         try:
@@ -1416,11 +1383,11 @@ class Checker:
             self.report(messages.StringDotFormatInvalidFormat, node, e)
             return
 
-        auto = None
+        auto      = None
         next_auto = 0
 
         placeholder_positional = set()
-        placeholder_named = set()
+        placeholder_named      = set()
 
         def _add_key(fmtkey):
             """Returns True if there is an error which should early-exit"""
@@ -1433,37 +1400,31 @@ class Checker:
             fmtkey, _, _ = fmtkey.partition('.')
             fmtkey, _, _ = fmtkey.partition('[')
 
-            try:
-                fmtkey = int(fmtkey)
-            except ValueError:
-                pass
+            try: fmtkey = int(fmtkey)
+            except ValueError: pass
             else:  # fmtkey was an integer
                 if auto is True:
                     self.report(messages.StringDotFormatMixingAutomatic, node)
                     return True
-                else:
-                    auto = False
+                else: auto = False
 
             if fmtkey == '':
                 if auto is False:
                     self.report(messages.StringDotFormatMixingAutomatic, node)
                     return True
-                else:
-                    auto = True
+                else: auto = True
 
                 fmtkey = next_auto
                 next_auto += 1
 
             if isinstance(fmtkey, int):
                 placeholder_positional.add(fmtkey)
-            else:
-                placeholder_named.add(fmtkey)
+            else: placeholder_named.add(fmtkey)
 
             return False
 
         for _, fmtkey, spec, _ in placeholders:
-            if _add_key(fmtkey):
-                return
+            if _add_key(fmtkey): return
 
             # spec can also contain format specifiers
             if spec is not None:
@@ -1482,8 +1443,7 @@ class Checker:
                             'Max string recursion exceeded',
                         )
                         return
-                    if _add_key(spec_fmtkey):
-                        return
+                    if _add_key(spec_fmtkey): return
 
         # bail early if there is *args or **kwargs
         if (
@@ -1495,9 +1455,11 @@ class Checker:
             return
 
         substitution_positional = set(range(len(node.args)))
-        substitution_named = {kwd.arg for kwd in node.keywords}
+        substitution_named      = {kwd.arg for kwd in
+                                  node.keywords}
 
-        extra_positional = substitution_positional - placeholder_positional
+        extra_positional = substitution_positional \
+                         - placeholder_positional
         extra_named = substitution_named - placeholder_named
 
         missing_arguments = (
@@ -1533,8 +1495,8 @@ class Checker:
         ):
             self._handle_string_dot_format(node)
 
-        omit = []
-        annotated = []
+        omit          = []
+        annotated     = []
         not_annotated = []
 
         if (
@@ -1604,8 +1566,7 @@ class Checker:
             with self._enter_annotation():
                 for annotated_node in annotated:
                     self.handleNode(annotated_node, node)
-        else:
-            self.handleChildren(node)
+        else: self.handleChildren(node)
 
     def _handle_percent_format(self, node):
         try:
@@ -1618,16 +1579,14 @@ class Checker:
             )
             return
 
-        named = set()
-        positional_count = 0
+        named      = set()
+        pos_count  = 0
         positional = None
         for _, placeholder in placeholders:
-            if placeholder is None:
-                continue
+            if placeholder is None: continue
             name, _, width, precision, conversion = placeholder
 
-            if conversion == '%':
-                continue
+            if conversion == '%': continue
 
             if conversion not in VALID_CONVERSIONS:
                 self.report(
@@ -1646,8 +1605,7 @@ class Checker:
                             messages.PercentFormatStarRequiresSequence,
                             node,
                         )
-                    else:
-                        positional_count += 1
+                    else: pos_count += 1
 
             if positional and name is not None:
                 self.report(
@@ -1662,10 +1620,8 @@ class Checker:
                 )
                 return
 
-            if positional:
-                positional_count += 1
-            else:
-                named.add(name)
+            if positional: pos_count += 1
+            else: named.add(name)
 
         if (
                 isinstance(node.right, (ast.List, ast.Tuple)) and
@@ -1676,11 +1632,11 @@ class Checker:
                 )
         ):
             substitution_count = len(node.right.elts)
-            if positional and positional_count != substitution_count:
+            if positional and pos_count != substitution_count:
                 self.report(
                     messages.PercentFormatPositionalCountMismatch,
                     node,
-                    positional_count,
+                    pos_count,
                     substitution_count,
                 )
             elif not positional:
@@ -1693,12 +1649,12 @@ class Checker:
                     for k in node.right.keys
                 )
         ):
-            if positional and positional_count > 1:
+            if positional and pos_count > 1:
                 self.report(messages.PercentFormatExpectedSequence, node)
                 return
 
             substitution_keys = {k.value for k in node.right.keys}
-            extra_keys = substitution_keys - named
+            extra_keys   = substitution_keys - named
             missing_keys = named - substitution_keys
             if not positional and extra_keys:
                 self.report(
@@ -1737,14 +1693,16 @@ class Checker:
     # "slice" type nodes
     SLICE = EXTSLICE = INDEX = handleChildren
 
-    # expression contexts are node instances too, though being constants
+    # expression contexts are node instances too, though
+    # being constants
     LOAD = STORE = DEL = AUGLOAD = AUGSTORE = PARAM = ignore
 
     # same for operators
-    AND = OR = ADD = SUB = MULT = DIV = MOD = POW = LSHIFT = RSHIFT = \
-        BITOR = BITXOR = BITAND = FLOORDIV = INVERT = NOT = UADD = USUB = \
-        EQ = NOTEQ = LT = LTE = GT = GTE = IS = ISNOT = IN = NOTIN = \
-        MATMULT = ignore
+    AND = OR = ADD = SUB = MULT = DIV = MOD = POW = \
+          LSHIFT = RSHIFT = BITOR = BITXOR = BITAND = \
+          FLOORDIV = INVERT = NOT = UADD = USUB = EQ = \
+          NOTEQ = LT = LTE = GT = GTE = IS = ISNOT = IN = \
+          NOTIN = MATMULT = ignore
 
     def RAISE(self, node):
         self.handleChildren(node)
@@ -1766,42 +1724,40 @@ class Checker:
 
     def JOINEDSTR(self, node):
         if (
-                # the conversion / etc. flags are parsed as f-strings without
-                # placeholders
+                # the conversion / etc. flags are parsed as
+                # f-strings without placeholders
                 not self._in_fstring and
                 not any(isinstance(x, ast.FormattedValue) for x in node.values)
         ):
             self.report(messages.FStringMissingPlaceholders, node)
 
         self._in_fstring, orig = True, self._in_fstring
-        try:
-            self.handleChildren(node)
-        finally:
-            self._in_fstring = orig
+        try: self.handleChildren(node)
+        finally: self._in_fstring = orig
 
     def TEMPLATESTR(self, node):
         if not any(isinstance(x, ast.Interpolation) for x in node.values):
             self.report(messages.TStringMissingPlaceholders, node)
 
-        # similar to f-strings, conversion / etc. flags are parsed as f-strings
-        # without placeholders
+        # similar to f-strings, conversion / etc. flags are
+        # parsed as f-strings without placeholders
         self._in_fstring, orig = True, self._in_fstring
-        try:
-            self.handleChildren(node)
-        finally:
-            self._in_fstring = orig
+        try: self.handleChildren(node)
+        finally: self._in_fstring = orig
 
     INTERPOLATION = handleChildren
 
     def DICT(self, node):
-        # Complain if there are duplicate keys with different values
-        # If they have the same value it's not going to cause potentially
-        # unexpected behaviour so we'll not complain.
+        # Complain if there are duplicate keys with
+        # different values
+        # If they have the same value it's not going to
+        # cause potentially unexpected behaviour so we'll
+        # not complain.
         keys = [
             convert_to_value(key) for key in node.keys
         ]
 
-        key_counts = collections.Counter(keys)
+        key_counts     = collections.Counter(keys)
         duplicate_keys = [
             key for key, count in key_counts.items()
             if count > 1
@@ -1842,11 +1798,10 @@ class Checker:
         self.handleChildren(node)
 
     def GLOBAL(self, node):
-        """
-        Keep track of globals declarations.
-        """
+        """Keep track of globals declarations."""
         global_scope_index = 1 if self._in_doctest() else 0
-        global_scope = self.scopeStack[global_scope_index]
+        global_scope       = self.scopeStack[
+                             global_scope_index]
 
         # Ignore 'global' statement in global scope.
         if self.scope is not global_scope:
@@ -1855,18 +1810,22 @@ class Checker:
             for node_name in node.names:
                 node_value = Assignment(node_name, node)
 
-                # Remove UndefinedName messages already reported for this name.
-                # TODO: if the global is not used in this scope, it does not
-                # become a globally defined name.  See test_unused_global.
+                # Remove UndefinedName messages already
+                # reported for this name.
+                # TODO: if the global is not used in this
+                # scope, it does not become a globally
+                # defined name.  See test_unused_global.
                 self.messages = [
                     m for m in self.messages if not
                     isinstance(m, messages.UndefinedName) or
                     m.message_args[0] != node_name]
 
-                # Bind name to global scope if it doesn't exist already.
+                # Bind name to global scope if it doesn't
+                # exist already.
                 global_scope.setdefault(node_name, node_value)
 
-                # Bind name to non-global scopes, but as already "used".
+                # Bind name to non-global scopes, but as
+                # already "used".
                 node_value.used = (global_scope, node)
                 for scope in self.scopeStack[global_scope_index + 1:]:
                     scope[node_name] = node_value
@@ -1885,12 +1844,14 @@ class Checker:
         """
         Handle occurrence of Name (which can be a load/store/delete access.)
         """
-        # Locate the name in locals / function / globals scopes.
+        # Locate the name in locals / function / globals
+        # scopes.
         if isinstance(node.ctx, ast.Load):
             self.handleNodeLoad(node, self.getParent(node))
             if (node.id == 'locals' and isinstance(self.scope, FunctionScope) and
                     isinstance(node._pyflakes_parent, ast.Call)):
-                # we are doing locals() call in current scope
+                # we are doing locals() call in current
+                # scope
                 self.scope.usesLocals = True
         elif isinstance(node.ctx, ast.Store):
             self.handleNodeStore(node)
@@ -1901,8 +1862,10 @@ class Checker:
             raise RuntimeError(f"Got impossible expression context: {node.ctx!r}")
 
     def CONTINUE(self, node):
-        # Walk the tree up until we see a loop (OK), a function or class
-        # definition (not OK), for 'continue', a finally block (not OK), or
+        # Walk the tree up until we see a loop (OK), a
+        # function or class
+        # definition (not OK), for 'continue', a finally
+        # block (not OK), or
         # the top module scope (not OK)
         n = node
         while hasattr(n, '_pyflakes_parent'):
@@ -1954,7 +1917,7 @@ class Checker:
     ASYNCFUNCTIONDEF = FUNCTIONDEF
 
     def LAMBDA(self, node):
-        args = []
+        args        = []
         annotations = []
 
         for arg in node.args.posonlyargs:
@@ -2019,7 +1982,8 @@ class Checker:
             for keywordNode in node.keywords:
                 self.handleNode(keywordNode, node)
             with self.in_scope(ClassScope):
-                # doctest does not process doctest within a doctest
+                # doctest does not process doctest within a
+                # doctest
                 # classes within classes are processed.
                 if (self.withDoctest and
                         not self._in_doctest() and
@@ -2037,20 +2001,22 @@ class Checker:
 
     def TUPLE(self, node):
         if isinstance(node.ctx, ast.Store):
-            # Python 3 advanced tuple unpacking: a, *b, c = d.
-            # Only one starred expression is allowed, and no more than 1<<8
-            # assignments are allowed before a stared expression. There is
-            # also a limit of 1<<24 expressions after the starred expression,
-            # which is impossible to test due to memory restrictions, but we
-            # add it here anyway
+            # Python 3 advanced tuple unpacking:
+            # a, *b, c = d.
+            # Only one starred expression is allowed, and no
+            # more than 1<<8 assignments are allowed before
+            # a stared expression. There is also a limit of
+            # 1<<24 expressions after the starred
+            # expression, which is impossible to test due to
+            # memory restrictions, but we add it here anyway
             has_starred = False
-            star_loc = -1
+            star_loc    = -1
             for i, n in enumerate(node.elts):
                 if isinstance(n, ast.Starred):
                     if has_starred:
                         self.report(messages.TwoStarredExpressions, node)
-                        # The SyntaxError doesn't distinguish two from more
-                        # than two.
+                        # The SyntaxError doesn't
+                        # distinguish two from more than two.
                         break
                     has_starred = True
                     star_loc = i
@@ -2073,8 +2039,7 @@ class Checker:
         if node.module == '__future__':
             if not self.futuresAllowed:
                 self.report(messages.LateFutureImport, node)
-        else:
-            self.futuresAllowed = False
+        else: self.futuresAllowed = False
 
         module = ('.' * node.level) + (node.module or '')
 
@@ -2083,14 +2048,16 @@ class Checker:
             if node.module == '__future__':
                 importation = FutureImportation(name, node, self.scope)
                 if alias.name not in __future__.all_feature_names:
-                    self.report(messages.FutureFeatureNotDefined,
-                                node, alias.name)
+                    self.report(messages
+                        .FutureFeatureNotDefined, node,
+                        alias.name)
                 if alias.name == 'annotations':
                     self.annotationsFutureEnabled = True
             elif alias.name == '*':
                 if not isinstance(self.scope, ModuleScope):
-                    self.report(messages.ImportStarNotPermitted,
-                                node, module)
+                    self.report(messages
+                        .ImportStarNotPermitted, node,
+                        module)
                     continue
 
                 self.scope.importStarred = True
@@ -2098,7 +2065,7 @@ class Checker:
                 importation = StarImportation(module, node)
             else:
                 importation = ImportationFrom(name, node,
-                                              module, alias.name)
+                              module, alias.name)
             self.addBinding(node, importation)
 
     def TRY(self, node):
@@ -2128,38 +2095,37 @@ class Checker:
             self.handleChildren(node)
             return
 
-        # If the name already exists in the scope, modify state of existing
-        # binding.
+        # If the name already exists in the scope, modify
+        # state of existing binding.
         if node.name in self.scope:
             self.handleNodeStore(node)
 
-        # 3.x: the name of the exception, which is not a Name node, but a
-        # simple string, creates a local that is only bound within the scope of
-        # the except: block. As such, temporarily remove the existing binding
-        # to more accurately determine if the name is used in the except:
-        # block.
+        # 3.x: the name of the exception, which is not a
+        # Name node, but a simple string, creates a local
+        # that is only bound within the scope of the except:
+        # block. As such, temporarily remove the existing
+        # binding to more accurately determine if the name
+        # is used in the except: block.
 
-        try:
-            prev_definition = self.scope.pop(node.name)
-        except KeyError:
-            prev_definition = None
+        try: prev_definition = self.scope.pop(node.name)
+        except KeyError: prev_definition = None
 
         self.handleNodeStore(node)
         self.handleChildren(node)
 
         # See discussion on https://github.com/PyCQA/pyflakes/pull/59
 
-        # We're removing the local name since it's being unbound after leaving
-        # the except: block and it's always unbound if the except: block is
-        # never entered. This will cause an "undefined name" error raised if
-        # the checked code tries to use the name afterwards.
+        # We're removing the local name since it's being
+        # unbound after leaving the except: block and it's
+        # always unbound if the except: block is never
+        # entered. This will cause an "undefined name" error
+        # raised if  the checked code tries to use the name
+        # afterwards.
         #
         # Unless it's been removed already. Then do nothing.
 
-        try:
-            binding = self.scope.pop(node.name)
-        except KeyError:
-            pass
+        try: binding = self.scope.pop(node.name)
+        except KeyError: pass
         else:
             if not binding.used:
                 self.report(messages.UnusedVariable, node, node.name)
@@ -2170,13 +2136,13 @@ class Checker:
 
     def ANNASSIGN(self, node):
         self.handleAnnotation(node.annotation, node)
-        # If the assignment has value, handle the *value* now.
+        # If the assignment has value, handle the value now.
         if node.value:
-            # If the annotation is `TypeAlias`, handle the *value* as an annotation.
+            # If the annotation is `TypeAlias`, handle The
+            # value as an annotation.
             if _is_typing(node.annotation, 'TypeAlias', self.scopeStack):
                 self.handleAnnotation(node.value, node)
-            else:
-                self.handleNode(node.value, node)
+            else: self.handleNode(node.value, node)
         self.handleNode(node.target, node)
 
     def COMPARE(self, node):
@@ -2193,7 +2159,8 @@ class Checker:
 
         self.handleChildren(node)
 
-    MATCH = MATCH_CASE = MATCHCLASS = MATCHOR = MATCHSEQUENCE = handleChildren
+    MATCH = MATCH_CASE = MATCHCLASS = \
+            MATCHOR = MATCHSEQUENCE = handleChildren
     MATCHSINGLETON = MATCHVALUE = handleChildren
 
     def _match_target(self, node):

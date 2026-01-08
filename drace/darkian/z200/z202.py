@@ -1,16 +1,19 @@
+# ======================== STANDARDS ========================
 import itertools
 import hashlib
 import time
 import ast
 
+# ========================== LOCALS =========================
 from drace import utils
+
 
 class Canonicalizer(ast.NodeTransformer):
     """
-Replace variable names, argument names, attribute names and
-constants with stable placeholders. The same original
-identifier within one subtree maps to the same placeholder to
-preserve structure
+    Replace variable names, argument names, attribute names
+    and constants with stable placeholders. The same original
+    identifier within one subtree maps to the same
+    placeholder to preserve structure.
     """
     def __init__(self):
         super().__init__()
@@ -94,8 +97,8 @@ preserve structure
 
 def canonical_block_dump(stmts: list[ast.stmt]) -> str:
     """
-Given a list of statement AST nodes, produce a canonical 
-string representation
+    Given a list of statement AST nodes, produce a canonical
+    string representation.
     """
     canon = Canonicalizer()
     # create a synthetic Module containing the stmts to 
@@ -116,8 +119,11 @@ def collect_sequences(tree: ast.AST, min_len: int = 2,
                       max_len: int = 6) -> dict[str, 
                       list[tuple[int, int, str]]]:
     """
-Walk the tree and collect contiguous sequences of statements from bodies
-Returns mapping: hash -> list of (start_lineno, end_lineno, dumped)
+    Walk the tree and collect contiguous sequences of
+    statements from bodies.
+
+    Returns mapping: hash -> list of (start_lineno,
+                     end_lineno, dumped)
     """
     sequences = {}
 
@@ -189,26 +195,24 @@ Returns mapping: hash -> list of (start_lineno, end_lineno, dumped)
 def is_trivial_by_line_ranges(matches: list[tuple[int, int]]
                              ) -> bool:
     """
-Check if matched blocks are trivially sequential (e.g.
-multiple 1-line dumps in a row)
+    Check if matched blocks are trivially sequential (e.g.
+    multiple 1-line dumps in a row)
     
-Example: [(36, 37), (37, 38), (38, 39)] -> True
+    Example: [(36, 37), (37, 38), (38, 39)] -> True
     """
     if len(matches) < 2: return False
 
     matches = sorted(matches)
-    for (a_start, a_end), (b_start, b_end) in zip(matches, matches[1:]):
-        if a_end != b_start: return False
-        if (a_end - a_start) != 1 or (b_end - b_start) != 1:
-            return False
+    for start, end in matches:
+        if end - start == 1: return True
 
-    return True
+    return False
 
 
 def is_argparse_like(dumped: str) -> bool:
     # A very rough structural match
     return dumped.count("Call(Attribute(Name(") >= 2 and \
-           "keyword(" in dumped or "Constant(" in dumped
+           utils.any_in("keyword(", "Constant(", eq=dumped)
 
 
 def is_trivial_dump(dumped: str,
@@ -223,10 +227,11 @@ def is_trivial_dump(dumped: str,
 
 def check(tree, file: str) -> list[dict]:
     """
-Z202: find repeated sequences of statements and suggest 
-      abstraction
-Returns list of issues; each issue contains occurrences and a
-short message
+    Z202: find repeated sequences of statements and suggest
+          abstraction
+
+    Returns list of issues; each issue contains occurrences
+    and a short message
     """
     seqs    = collect_sequences(tree)
     results = []

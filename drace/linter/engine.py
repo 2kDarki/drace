@@ -1,12 +1,12 @@
-# ===================== STANDARDS ======================
+# ======================= STANDARDS =========================
 from pathlib import Path
 import io
 
-# ======================= LOCALS =======================
-from .pyflakes import reporter as flake_reporter, flake_api
+# ========================= LOCALS ==========================
 from drace.constants import IGNORED_RULES
 from drace.darkian import get_rules
 from .pycodestyle import Checker
+from .pyflakes import flake_api
 from drace import utils
 
 
@@ -23,17 +23,18 @@ def run_style_checks(file: str | Path) -> list[dict]:
     checker = Checker(file)
     checker.check_all()
 
-    final = []
+    results = []
     for line, col, code, msg in checker.report.errors:
         if code in IGNORE: continue
-        final.append({
+        results.append({
             "file": file,
             "line": line,
              "col": col,
             "code": code,
              "msg": " ".join(msg.strip().split()[1:])
         })
-    return final
+
+    return results
 
 
 def run_flake_checks(file: str | Path) -> list[dict]:
@@ -60,28 +61,27 @@ def run_flake_checks(file: str | Path) -> list[dict]:
 
         return code, msg
 
-    buffer   = io.StringIO()
-    reporter = flake_reporter.Reporter(buffer, buffer)
-    flake_api.check(str(file), reporter)
+    buffer = io.StringIO()
+    flake_api.check(str(file), buffer)
 
-    final = []
-    for line in buffer.getvalue().splitlines():
-        parts = line.split(":", 3)[1:]
+    results = []
+    for warning in buffer.getvalue().splitlines():
+        parts = warning.split(":", 3)[1:]
         if len(parts) == 3:
-            lineno, col, msg = parts
-            code, message    = format_flake(msg)
+            line, col, _  = parts
+            code, message = format_flake(_)
             if code in IGNORE: continue
             if "unexpected indent" in message: continue
             if "unterminated stri" in message: continue
-            final.append({
+            results.append({
                 "file": file,
-                "line": int(lineno.strip()),
+                "line": int(line.strip()),
                  "col": int(col.strip()),
                 "code": code,
                  "msg": message
             })
 
-    return final
+    return results
 
 
 def run_darkian_checks(file: str | Path) -> list[dict]:
@@ -89,18 +89,17 @@ def run_darkian_checks(file: str | Path) -> list[dict]:
     lines         = Path(file).read_text(encoding="utf-8")\
                     .splitlines()
     file          = str(file)
-    final         = []
+    results       = []
     tree, synerrs = utils.tolerant_parse_module(lines, True)
 
     for rule in get_rules():
-        result = rule(lines, tree, file)
-        final.extend(result)
+        results.extend(rule(lines, tree, file))
 
     for synerr in synerrs:
         if "triple-" in synerr[1]: continue
         if "invalid" in synerr[1]: continue
         if "string " in synerr[1]: continue
-        final.append({
+        results.append({
             "file": file,
             "line": synerr[0],
              "col": 1,
@@ -108,7 +107,7 @@ def run_darkian_checks(file: str | Path) -> list[dict]:
              "msg": f"Syntax Error: {synerr[1]}"
         })
 
-    return final
+    return results
 
 
 def scrutinize(file: str | Path) -> list[dict]:

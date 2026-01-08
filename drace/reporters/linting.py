@@ -41,7 +41,14 @@ def lint_cmd(path: str, score: bool, first: bool,
         col   = format_order(r['col'], cdeno)
         ccode = color(code, BAD, bold=bold)
         msg   = r['msg'].strip()
-        if code == "Z101": msg, rest = msg.split("#", 1)
+
+        if code == "Z101":
+            msg, rest = msg.split("#", 1)
+            check_msg = msg.split(":", 1)
+            if len(check_msg) > 1 and check_msg[1] != "":
+                msg  = check_msg[0] + ":\n\n"
+                msg += check_msg[1].strip()
+
         first      = f"{file}{SEP}{line}{SEP}{col} {ccode} "
         suggestion = f"{first}{msg}"
         indent     = visual_width(first) if WRAP else 0
