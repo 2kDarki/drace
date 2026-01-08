@@ -1,6 +1,4 @@
-"""
-Provide the class Message and its subclasses.
-"""
+"""Provide the class Message and its subclasses."""
 
 
 class Message:

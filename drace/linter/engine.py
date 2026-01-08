@@ -3,9 +3,8 @@ from pathlib import Path
 import io
 
 # ======================= LOCALS =======================
-from .pyflakes import reporter as flake_reporter
+from .pyflakes import reporter as flake_reporter, flake_api
 from drace.constants import IGNORED_RULES
-from .pyflakes import api as flake_api
 from drace.darkian import get_rules
 from .pycodestyle import Checker
 from drace import utils
@@ -17,7 +16,7 @@ IGNORE = ("E113", "E121", "E124", "E126", "E127", "E128",
 
 
 def run_style_checks(file: str | Path) -> list[dict]:
-    """Run Darkian-patched pycodestyle checks on a file"""
+    """Run Darkian-patched pycodestyle checks on a file."""
     file = str(file)
 
     # Build checker and capture final
@@ -38,7 +37,7 @@ def run_style_checks(file: str | Path) -> list[dict]:
 
 
 def run_flake_checks(file: str | Path) -> list[dict]:
-    """Run pyflakes checks on a file"""
+    """Run pyflakes checks on a file."""
     def format_flake(msg: str) -> tuple[str]:
         code = "Z999"
         if "imported but unused" in msg: code = "W611"
@@ -63,7 +62,7 @@ def run_flake_checks(file: str | Path) -> list[dict]:
 
     buffer   = io.StringIO()
     reporter = flake_reporter.Reporter(buffer, buffer)
-    flake_api.checkPath(str(file), reporter)
+    flake_api.check(str(file), reporter)
 
     final = []
     for line in buffer.getvalue().splitlines():
@@ -86,7 +85,7 @@ def run_flake_checks(file: str | Path) -> list[dict]:
 
 
 def run_darkian_checks(file: str | Path) -> list[dict]:
-    "Run Darkian checks on a file"
+    """Run Darkian checks on a file."""
     lines         = Path(file).read_text(encoding="utf-8")\
                     .splitlines()
     file          = str(file)
@@ -113,7 +112,7 @@ def run_darkian_checks(file: str | Path) -> list[dict]:
 
 
 def scrutinize(file: str | Path) -> list[dict]:
-    """Lint a file using pyflakes, pycodestyle, and darkian"""
+    """Lint a file."""
     final  = []
     final += run_style_checks(file)
     final += run_flake_checks(file)

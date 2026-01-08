@@ -93,7 +93,7 @@ def _shift_node_lines(node: ast.AST, offset: int) -> None:
 
 def try_to_parse(source: str) -> ast.Module | None:
     try: tree = ast.parse(source)
-    except SyntaxError: return
+    except SyntaxError: return None
     return tree
 
 
