@@ -1,7 +1,5 @@
 # ======================== STANDARDS ========================
-import itertools
 import hashlib
-import time
 import ast
 
 # ========================== LOCALS =========================
@@ -54,7 +52,8 @@ class Canonicalizer(ast.NodeTransformer):
         # blocks)
         node      = self.generic_visit(node)
         node.name = "_fn"
-        # drop decorators and annotations (they can leak 
+
+        # drop decorators and annotations (they can leak
         # external names)
         node.decorator_list = []
         node.returns        = None
@@ -68,22 +67,27 @@ class Canonicalizer(ast.NodeTransformer):
         return node
 
     def visit_Attribute(self, node: ast.Attribute):
-        # replace attribute name with placeholder but keep
+        # Replace attribute name with placeholder but keep
         # the structure (obj.attr -> obj._A0)
         node = self.generic_visit(node)
-        # map attr name as if it were a name (but distinct
+
+        # Map attr name as if it were a name (but distinct
         # space)
         attr_key = f"attr::{node.attr}"
         if attr_key not in self.name_map:
             self.name_map[attr_key] = f"_A{self._n_name}"
             self._n_name += 1
-        return ast.copy_location(ast.Attribute(value=node.value, attr=self.name_map[attr_key], ctx=node.ctx), node)
+
+        return ast.copy_location(ast.Attribute(value=node
+               .value, attr=self.name_map[attr_key],
+               ctx=node.ctx), node)
 
     def visit_Constant(self, node: ast.Constant):
-        # replace with placeholder constant name (string) so
+        # Replace with placeholder constant name (string) so
         # ast.dump becomes deterministic
         placeholder = self._map_const(node.value)
-        # represent placeholder as a NameConstant-like node
+
+        # Represent placeholder as a NameConstant-like node
         # to avoid mixing types
         return ast.copy_location(ast.Constant(
                value=placeholder), node)
@@ -101,22 +105,23 @@ def canonical_block_dump(stmts: list[ast.stmt]) -> str:
     string representation.
     """
     canon = Canonicalizer()
-    # create a synthetic Module containing the stmts to 
+    # Create a synthetic Module containing the stmts to
     # maintain context
-    module = ast.Module(body=stmts, type_ignores=[])
-    # transform in place
-    mod2 = canon.visit(module)
-    ast.fix_missing_locations(mod2)
-    # use ast.dump with sorted/consistent fields
-    dumped = ast.dump(mod2, annotate_fields=False,
+    module1 = ast.Module(body=stmts, type_ignores=[])
+    module2 = canon.visit(module1)
+    ast.fix_missing_locations(module2)
+
+    # Use ast.dump with sorted/consistent fields
+    dumped = ast.dump(module2, annotate_fields=False,
              include_attributes=False)
-    # hash it for compactness
+
+    # Hash it for compactness
     return hashlib.sha256(dumped.encode("utf-8"))\
           .hexdigest(), dumped
 
 
-def collect_sequences(tree: ast.AST, min_len: int = 2, 
-                      max_len: int = 6) -> dict[str, 
+def collect_sequences(tree: ast.AST, min_len: int = 2,
+                      max_len: int = 6) -> dict[str,
                       list[tuple[int, int, str]]]:
     """
     Walk the tree and collect contiguous sequences of
@@ -127,101 +132,102 @@ def collect_sequences(tree: ast.AST, min_len: int = 2,
     """
     sequences = {}
 
-    # helper to walk every body (list of statements) in 
+    # Helper to walk every body (list of statements) in
     # relevant nodes
     class BodyWalker(ast.NodeVisitor):
-        def visit_FunctionDef(self, node):
+        def _walk_and_visit(self, node, orelse: bool):
             self._walk_body(node.body)
-            # also visit nested content
+            if orelse: self._walk_body(node.orelse)
             self.generic_visit(node)
 
-        def visit_If(self, node):
-            self._walk_body(node.body)
-            self._walk_body(node.orelse)
-            self.generic_visit(node)
+        def visit_FunctionDef(self, node: ast.FunctionDef):
+            self._walk_and_visit(node, orelse=False)
 
-        def visit_For(self, node):
-            self._walk_body(node.body)
-            self._walk_body(node.orelse)
-            self.generic_visit(node)
+        def visit_If(self, node: ast.If):
+            self._walk_and_visit(node, orelse=True)
 
-        def visit_While(self, node):
-            self._walk_body(node.body)
-            self._walk_body(node.orelse)
-            self.generic_visit(node)
+        def visit_For(self, node: ast.For):
+            self._walk_and_visit(node, orelse=True)
 
-        def visit_With(self, node):
-            self._walk_body(node.body)
-            self.generic_visit(node)
+        def visit_While(self, node: ast.While):
+            self._walk_and_visit(node, orelse=True)
 
-        def visit_Try(self, node):
+        def visit_With(self, node: ast.With):
+            self._walk_and_visit(node, orelse=False)
+
+        def visit_Try(self, node: ast.Try):
             self._walk_body(node.body)
             self._walk_body(node.orelse)
             self._walk_body(node.finalbody)
-            for h in node.handlers:
-                self._walk_body(h.body)
+            for h in node.handlers: self._walk_body(h.body)
             self.generic_visit(node)
 
-        def visit_Module(self, node):
-            self._walk_body(node.body)
-            self.generic_visit(node)
+        def visit_Module(self, node: ast.Module):
+            self._walk_and_visit(node, orelse=False)
 
-        def _walk_body(self, stmts):
-            # convert list of stmts into sliding windows of 
+        def _walk_body(self, stmts: list[ast.stmt]):
+            # Convert list of stmts into sliding windows of
             # sizes max_len..min_len (longer first)
             n = len(stmts)
-            # build linear list of lineno for bounds
-            for l in range(max_len, min_len - 1, -1):
-                if n < l:
-                    continue
-                for i in range(0, n - l + 1):
-                    block = stmts[i:i+l]
-                    # ignore blocks that don't have lineno 
+            # Build linear list of lineno for bounds
+            for length in range(max_len, min_len - 1, -1):
+                if n < length: continue
+                for i in range(0, n - length + 1):
+                    block = stmts[i:i + length]
+
+                    # Ignore blocks that don't have lineno
                     # info
                     if not hasattr(block[0], "lineno"):
                         continue
                     h, dumped = canonical_block_dump(block)
                     start     = block[0].lineno
-                    end       = getattr(block[-1], 
-                                "end_lineno", 
+                    end       = getattr(block[-1],
+                                "end_lineno",
                                 block[-1].lineno)
-                    sequences.setdefault(h, []).append((start,
-                        end, dumped))
-    
+                    sequences.setdefault(h, []).append((
+                        start, end, dumped))
+
     BodyWalker().visit(tree)
     return sequences
 
 
-def is_trivial_by_line_ranges(matches: list[tuple[int, int]]
+def _is_trivial_by_line_ranges(matches: list[tuple[int, int]]
                              ) -> bool:
     """
     Check if matched blocks are trivially sequential (e.g.
     multiple 1-line dumps in a row)
-    
-    Example: [(36, 37), (37, 38), (38, 39)] -> True
+
+    Examples:
+      - [(36, 37), (37, 38), (38, 39)] -> True
+      - [(36, 38), (37, 39), (38, 40)] -> True
+      - [(36, 37), (38, 39), (40, 41)] -> True
     """
     if len(matches) < 2: return False
 
     matches = sorted(matches)
-    for start, end in matches:
+    for i, (start, end) in enumerate(matches):
         if end - start == 1: return True
+        try:
+            if matches[i + 1][0] in range(start, end + 1):
+                return True
+        except IndexError: pass
 
     return False
 
 
-def is_argparse_like(dumped: str) -> bool:
+def _is_argparse_like(dumped: str) -> bool:
     # A very rough structural match
     return dumped.count("Call(Attribute(Name(") >= 2 and \
            utils.any_in("keyword(", "Constant(", eq=dumped)
 
 
 def is_trivial_dump(dumped: str,
-                    line_ranges: list[tuple[int, int]]
-                   ) -> bool:
+                    ranges: list[tuple[int, int]]) -> bool:
     """Heuristic to ignore trivial blocks"""
     if len(dumped) < 50: return True
-    if is_argparse_like(dumped): return True
-    if is_trivial_by_line_ranges(line_ranges): return True
+    if "Return(" in dumped: return True
+    if _is_argparse_like(dumped): return True
+    if _is_trivial_by_line_ranges(ranges): return True
     return False
 
 
@@ -235,12 +241,13 @@ def check(tree, file: str) -> list[dict]:
     """
     seqs    = collect_sequences(tree)
     results = []
-    # --- canonical selection & de-overlap logic ---
+    limit   = 8
+
     # seqs: mapping h -> list[(start, end, dumped)]
     # Build candidate meta list
     candidates = []
     for h, occ in seqs.items():
-        # collapse duplicates that start at same line (keep
+        # Collapse duplicates that start at same line (keep
         # earliest end)
         seen = {}
         for start, end, dumped in occ:
@@ -248,14 +255,17 @@ def check(tree, file: str) -> list[dict]:
             seen[key] = dumped
         occ_unique = [(s, e, seen[(s, e)]) for s, e in seen]
         if len(occ_unique) < 3: continue
-        # prefer non-trivial blocks
-        line_ranges = [(s, e) for s, e, _ in occ_unique]
+
+        # Prefer non-trivial blocks
+        line_ranges   = [(s, e) for s, e, _ in occ_unique]
         _, _, dumped0 = occ_unique[0]
         if is_trivial_dump(dumped0, line_ranges): continue
-        # candidate metadata
+
+        # Candidate metadata
         first_start = min(s for s, e, d in occ_unique)
-        first_end = max(e for s, e, d in occ_unique)
-        # length in lines (used for sorting preference)
+        first_end   = max(e for s, e, d in occ_unique)
+
+        # Length in lines (used for sorting preference)
         length = first_end - first_start + 1
         candidates.append({
             "hash": h,
@@ -267,14 +277,14 @@ def check(tree, file: str) -> list[dict]:
 
     if not candidates: return []
 
-    # sort by occurrence count desc, then by length desc
+    # Sort by occurrence count desc, then by length desc
     # (longer blocks first)
-    candidates.sort(key=lambda c: (c["count"], c["length"]), 
+    candidates.sort(key=lambda c: (c["count"], c["length"]),
                     reverse=True)
 
     # Greedy select non-overlapping candidates
     selected       = []
-    occupied_lines = set()  # lines already claimed by chosen
+    occupied_lines = set()  # Lines already claimed by chosen
                             # candidates
 
     def range_overlaps_with_occupied(start, end):
@@ -284,19 +294,23 @@ def check(tree, file: str) -> list[dict]:
         return False
 
     for cand in candidates:
-        # build list of unique (start, end) occurrences for 
+        # Build list of unique (start, end) occurrences for
         # this candidate
-        occs = sorted({(s, e) for s, e, d in cand["occurrences"]}, key=lambda t: t[0])
-        # if all occurrences would overlap existing
+        occs = sorted({(s, e) for s, e, d in
+               cand["occurrences"]}, key=lambda t: t[0])
+
+        # If all occurrences would overlap existing
         # selections, skip candidate
-        non_overlapping_occs = [(s, e) for s, e in occs 
+        non_overlapping_occs = [(s, e) for s, e in occs
                         if not range_overlaps_with_occupied(
                                s, e)]
         if len(non_overlapping_occs) < 2: continue
-        # select this candidate: mark its first
+
+        # Select this candidate: mark its first
         # non-overlapping occurrence as primary
         primary_start, primary_end = non_overlapping_occs[0]
-        # mark all selected occurrences' lines as occupied to
+
+        # Mark all selected occurrences' lines as occupied to
         # prevent downstream overlaps
         for s, e in non_overlapping_occs:
             for ln in range(s, e + 1): occupied_lines.add(ln)
@@ -311,22 +325,23 @@ def check(tree, file: str) -> list[dict]:
     # Build results from selected candidates
     results = []
     for s in selected:
-        s_start, s_end = s["primary"]
-        matches = s["matches"]
-        # build readable match summary; limit shows to first 
+        start, _ = s["primary"]
+        matches  = s["matches"]
+
+        # Build readable match summary; limit shows to first
         # 8 to avoid huge messages
-        display_matches = matches if len(matches) <= 8 \
-                     else matches[:8]
+        display_matches = matches if len(matches) <= limit \
+                     else matches[:limit]
         message = f"repeated block detected ({s['count']} " \
                 +  "occurrences). Consider extracting a " \
                 +  "function for the block at lines " \
                 + f"{display_matches}"
-        
-        if len(matches) > 8:
-            message += f" (and {len(matches)-8} more occurrences)"
+
+        if len(matches) > limit:
+            message += f" (and {len(matches) - limit} more occurrences)"
         results.append({
             "file": file,
-            "line": s_start,
+            "line": start,
             "col": 1,
             "code": "Z202",
             "msg": message,

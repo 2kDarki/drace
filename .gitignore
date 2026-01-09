@@ -1,6 +1,7 @@
 Project specific
 black/
 flake8/
+defaults.json
 
 Byte-compiled / optimized / DLL files
 __pycache__/

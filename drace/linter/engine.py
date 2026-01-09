@@ -11,7 +11,7 @@ from drace import utils
 
 
 IGNORE = ("E113", "E121", "E124", "E126", "E127", "E128", 
-          "E131", "E221", "E701", "E702", "E704") \
+          "E131", "E221", "E222", "E701", "E702", "E704") \
        + tuple(IGNORED_RULES)
 
 
