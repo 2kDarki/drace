@@ -321,7 +321,7 @@ def _handle_list(key: str, values: tuple[str | list]
             if os.sep in value:
                 value = value.split(os.sep)[-1]
             array[i] = value
-    
+
     return array
 
 
@@ -388,8 +388,7 @@ def config_cmd(args: list[str] | list) -> None:
         print(); return
 
     if args[0] == "help": help_menu.main("config")
-    if args[0] == "reset":
-        config.reset(args[1]); return
+    if args[0] == "reset": config.reset(args[1]); return
 
     if args[0] == "show":
         try:
@@ -411,10 +410,8 @@ def config_cmd(args: list[str] | list) -> None:
     truthy   = ["1", "true", "yeah", "yes", "y", "on", "ok"]
     exp_list = ""
     try:
-        if _type == bool:
-            value = values[0].lower() in truthy
-        elif _type == list:
-            value = _handle_list(key, values)
+        if _type == bool: value = values[0].lower() in truthy
+        elif _type == list: value = _handle_list(key, values)
         else:
             if _type == str and values[0] not in CMDS:
                 exp_list += ", ".join(CMDS[:-1])
