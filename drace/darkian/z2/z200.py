@@ -20,10 +20,11 @@ def check_z200(context: Context) -> list[Dict]:
         line  = lines[i]
         sline = line.strip()
 
+        i += 1
         if sline.startswith(KEYWORDS) and sline.endswith(":"):
             indent = len(line) - len(line.lstrip())
             block  = []
-            j      = i + 1
+            j      = i
 
             while j < total:
                 next_line = lines[j]
@@ -35,21 +36,19 @@ def check_z200(context: Context) -> list[Dict]:
                 j += 1
 
             # Check only meaningful lines
-            body = [b for _, b in block if b and not
-                    b.startswith("#")]
+            exclude = list(KEYWORDS) + ["#"]
+            body    = [b for _, b in block if b and not
+                      (b.startswith(e) for e in exclude)]
             if len(body) == 1:
                 compact = f"{line.rstrip()} {body[0]}"
                 if len(compact) <= LINE_LEN:
                     results.append({
                         "file": file,
-                        "line": i + 1,
+                        "line": i,
                         "col": 1,
                         "code": "Z200",
                         "msg": "control block could be "
                                "compacted to a one-liner"
                     })
-
-            i += 1
-        else: i += 1
 
     return results
