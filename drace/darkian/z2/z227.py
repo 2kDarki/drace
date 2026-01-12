@@ -4,6 +4,15 @@ import ast
 from drace.types import Context, Dict
 from drace import utils
 
+
+def _is_not_synthetic_name(name: str) -> bool:
+    if any(name.startswith(p) for p in ["_V", "_A"]):
+        try: int(name[2]); return False
+        except ValueError: pass
+
+    return True
+
+
 def iter_used_names(node: ast.AST) -> set[str]:
     used: set[str] = set()
 
@@ -15,7 +24,7 @@ def iter_used_names(node: ast.AST) -> set[str]:
             return
 
         if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load):
-            used.add(n.id)
+            if _is_not_synthetic_name(n.id): used.add(n.id)
 
         for child in ast.iter_child_nodes(n):
             visit(child)
