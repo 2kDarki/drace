@@ -1,5 +1,4 @@
 import ast
-import os
 import re
 
 from drace.types import Context, Dict
@@ -11,7 +10,7 @@ _ASSIGN_RE = re.compile(r"(?<![=!<>+\-*/%&|^])=(?!=)")
 
 def _find_assignment_pos(line: str) -> int | None:
     """
-    Return column index (0-based) of the assignment '=' for 
+    Return column index (0-based) of the assignment '=' for
     real assignments, or None
     """
     m = _ASSIGN_RE.search(line)
@@ -95,7 +94,7 @@ def _group_assignments_by_indent(assign_ln:
 def _collect_assignment_lines_and_blocks(tree
         ) -> list[tuple[int, ast.AST]]:
     """
-    Return list of (lineno, node) for assignment-like 
+    Return list of (lineno, node) for assignment-like
     statements found in AST, sorted by lineno.
     """
     out = []
@@ -127,7 +126,6 @@ def check_z100(context: Context) -> list[Dict]:
     for group in groups:
         # build the lines corresponding to those assignment
         # line numbers
-        block_lines  = [lines[ln - 1] for ln in group]
         eq_positions = []
         eq_pos_map   = {}
         for idx, ln in enumerate(group):

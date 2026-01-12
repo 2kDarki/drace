@@ -5,8 +5,8 @@ import ast
 import sys
 
 # ======================= THIRD-PARTIES =====================
-from tuikit.textools import Align, wrap_text, visual_width
 from tuikit.logictools import any_eq, any_in, all_in
+from tuikit.textools import Align, wrap_text, visual_width
 from tuikit.textools import transmit as _transmit
 from tuikit.listools import format_order
 from tuikit.console import underline

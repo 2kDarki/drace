@@ -15,11 +15,14 @@ def _is_comment_or_empty(line: str) -> bool:
 
 def _is_semicolon_compound(line: str) -> bool:
     """
-    Return True if the physical line contains multiple independent Python statements
-    separated by semicolons. We use utils.tolerant_parse_module to avoid false positives (strings, SQL, etc).
+    Return True if the physical line contains multiple
+    independent Python statements
+    separated by semicolons. We use
+    `utils.tolerant_parse_module` to avoid false positives
+    (strings, SQL, etc).
     """
     tree = utils.tolerant_parse_module(line)
-    # treat as compound only if parse produced 2+ top-level
+    # Treat as compound only if parse produced 2+ top-level
     # statements
     return len(getattr(tree, "body", [])) >= 2
 
@@ -40,51 +43,54 @@ def check_z201(context: Context) -> list[Dict]:
     tree    = context["tree"]
     file    = context["file"]
     results = []
-    source  = "\n".join(lines)
+    src     = "\n".join(lines)
     for node in ast.walk(tree):
         if isinstance(node, CONTROL_NODE_TYPES):
-            # ensure node has location info
-            if not hasattr(node, "lineno") or not hasattr(node, "end_lineno"):
-                continue
-            # only care about nodes that occupy a single physical line
-            if node.lineno != node.end_lineno:
-                continue
-            # get source for the node; ast.get_source_segment may return None in some cases
-            try:
-                node_source = ast.get_source_segment(source, node) or ""
+            # Ensure node has location info
+            if not hasattr(node, "lineno") \
+                or not hasattr(node, "end_lineno"): continue
+            # Only care about nodes that occupy a single
+            # physical line
+            if node.lineno != node.end_lineno: continue
+            # Get src for the node; ast.get_source_segment
+            # may return None in some cases
+            try: node_src = ast.get_source_segment(src, node)\
+                         or ""
             except Exception:
-                # fallback: slice from lineno..end_lineno
-                start = node.lineno - 1
-                node_source = lines[start].rstrip("\n")
-            if not node_source:
-                continue
-            if len(node_source) > utils.LINE_LEN:
+                # Fallback: slice from lineno..end_lineno
+                start    = node.lineno - 1
+                node_src = lines[start].rstrip("\n")
+            if not node_src: continue
+
+            col = (getattr(node, "col_offset", 0) + 1) if \
+                   hasattr(node, "col_offset") else 1
+            if len(node_src) > utils.LINE_LEN:
                 results.append({
                     "file": file,
                     "line": node.lineno,
-                    "col": (getattr(node, "col_offset", 0) + 1) if hasattr(node, "col_offset") else 1,
+                    "col": col,
                     "code": "Z201",
-                    "msg": "overly compact block exceeds line length; consider splitting"
+                    "msg": "overly compact block exceeds "
+                           "line length; consider splitting"
                 })
 
-    # --- Part B: semicolon-joined lines that parse to multiple statements ---
     for i, raw in enumerate(lines):
-        if _is_comment_or_empty(raw):
-            continue
-        # Only consider physically single lines (they already are, since iterating lines)
-        if ";" not in raw:
-            continue
+        if _is_comment_or_empty(raw): continue
+        # Only consider physically single lines (they already
+        # are, since iterating lines)
+        if ";" not in raw: continue
         # Quick length check first to avoid repeated parsing
-        if len(raw) <= utils.LINE_LEN:
-            continue
-        # Try AST parse to verify this line is truly multiple statements
+        if len(raw) <= utils.LINE_LEN: continue
+        # Try AST parse to verify this line is truly multiple
+        # statements
         if _is_semicolon_compound(raw):
             results.append({
                 "file": file,
                 "line": i + 1,
                 "col": 1,
                 "code": "Z201",
-                "msg": "overly compact block exceeds line length; consider splitting"
+                "msg": "overly compact block exceeds line "
+                       "length; consider splitting"
             })
 
     return results

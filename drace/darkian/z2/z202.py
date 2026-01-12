@@ -25,9 +25,9 @@ class Canonicalizer(ast.NodeTransformer):
         self._a  = 0
         self._at = 0
 
-    def _map(self, name: str, space: dict, prefix: str) -> str:
+    def _map(self, name: str, space: dict, pfx: str) -> str:
         if name not in space:
-            space[name] = f"{prefix}{len(space)}"
+            space[name] = f"{pfx}{len(space)}"
         return space[name]
 
     # Identifiers
@@ -156,6 +156,7 @@ def has_control_flow(stmts):
     control_nodes = (ast.While, ast.For, ast.If, ast.With,
                      ast.Match, ast.Try)
     return any(isinstance(s, control_nodes) for s in stmts)
+
 
 def score_candidate(count: int, length: int) -> int:
     return count * math.log(length + 1)
@@ -346,7 +347,8 @@ def check_z202(context: Context) -> list[Dict]:
                 + f" lines {matches[:limit]}"
 
         if len(matches) > limit:
-            message += f" (and {len(matches) - limit} more occurrences)"
+            message += f" (and {len(matches) - limit} more" \
+                     +  " occurrences)"
         results.append({
             "file": file,
             "line": start,

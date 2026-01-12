@@ -1,13 +1,9 @@
-from pathlib import Path
 import importlib.util
 import site
-import ast
 import os
-import re
 
 from drace.utils import Align, any_eq, all_in, any_in
 from drace.types import Context, Dict
-from drace.constants import KEYWORDS
 from drace.utils import find_proot
 
 
@@ -53,7 +49,7 @@ def _is_editable_third_party(path: str) -> bool:
     try: pkgs = os.listdir(site.getsitepackages()[0])
     except FileNotFoundError: return False
 
-    editables = [pkg.split(".", 1)[1].replace("pth", 
+    editables = [pkg.split(".", 1)[1].replace("pth",
                 "dist-info") for pkg in pkgs if all_in(
                 "editable", "pth", eq=pkg)]
 
@@ -66,15 +62,16 @@ def _is_editable_third_party(path: str) -> bool:
 
 def _classify_import(name: str, cwd: str) -> str:
     """
-    Return one of: 'FUTURE', 'STANDARDS', 'THIRD_PARTIES', 
+    Return one of: 'FUTURE', 'STANDARDS', 'THIRD_PARTIES',
     'LOCALS'
-    Robust against origin values that are special tokens or 
+
+    Robust against origin values that are special tokens or
     non-absolute paths.
     """
     if name == "__future__": return "FUTURE"
 
     origin = _module_spec_origin(name)
-    # If we couldn't resolve an origin, conservatively call 
+    # If we couldn't resolve an origin, conservatively call
     # it THIRD_PARTIES
     if not origin: return "THIRD_PARTIES"
 
@@ -82,22 +79,18 @@ def _classify_import(name: str, cwd: str) -> str:
     if origin == "__future__": return "FUTURE"
     if origin == "builtin": return "STANDARDS"
 
-    # At this point origin should be a path-like string 
+    # At this point origin should be a path-like string
     # (absolute or relative).
-    # Make both cwd and origin absolute if possible.
-    try: cwd_abs = os.path.abspath(cwd) if cwd else None
-    except Exception: cwd_abs = cwd
-
     try: origin_abs = os.path.abspath(origin)
     except Exception: origin_abs = origin
 
     origin_l = origin_abs.lower() if isinstance(origin_abs,
                str) else ""
-    
-    # Heuristic: if 'python' appears in the origin path 
+
+    # Heuristic: if 'python' appears in the origin path
     # (stdlib) -> STANDARDS
-    if "python" in origin_l and not any_in("site-packages", "dist-packages", eq=origin_l):
-        return "STANDARDS"
+    if "python" in origin_l and not any_in("site-packages",
+        "dist-packages", eq=origin_l): return "STANDARDS"
 
     # site-packages and dist-packages indicate third-party
     if any_in("site-packages", "dist-packages", eq=origin_l)\
@@ -109,7 +102,9 @@ def _classify_import(name: str, cwd: str) -> str:
 
 
 def _import_key_length(line: str) -> int:
-    """Used to sort imports by descending physical line length."""
+    """
+    Used to sort imports by descending physical line length.
+    """
     return len(line.rstrip("\n"))
 
 
@@ -134,15 +129,17 @@ def _render_darkian_block(grouped_lines: dict[str,
         # add section header for non-FUTURE groups
         center = Align(offset=2).center
         if group == "STANDARDS":
-            sections.append(f"\n# {center(' STANDARDS ', '=')}")
+            sections.append(f"\n# {center(' STANDARDS ',
+                '=')}")
         elif group == "THIRD_PARTIES":
-            sections.append(f"# {center(' THIRD PARTIES ', '=')}")
+            sections.append(f"# {center(' THIRD PARTIES ',
+                '=')}")
         elif group == "LOCALS":
             sections.append(f"# {center(' LOCALS ', '=')}")
         sections.extend(lines)
         sections.append("")  # blank line after section
 
-    # trim trailing blank lines
+    # Trim trailing blank lines
     while sections and sections[-1] == "": sections.pop()
     return "\n".join(sections)
 
@@ -160,11 +157,11 @@ def check_z101(context: Context) -> list[Dict]:
     cwd     = os.getcwd()
 
     # Collect contiguous import blocks: sequence of
-    # import/from lines (allow inline comments but break on 
+    # import/from lines (allow inline comments but break on
     # other code)
-    import_blocks: list[tuple[int, list[tuple[int, str]]]] = []
-    cur_block: list[tuple[int, str]] = []
-    cur_start = None
+    import_blocks = []
+    cur_block     = []
+    cur_start     = None
     for i, raw in enumerate(lines):
         s = raw.strip()
         if s.startswith("import ") or s.startswith("from "):
@@ -175,8 +172,7 @@ def check_z101(context: Context) -> list[Dict]:
                 import_blocks.append((cur_start, cur_block))
                 cur_block = []
                 cur_start = None
-    if cur_block:
-        import_blocks.append((cur_start, cur_block))
+    if cur_block: import_blocks.append((cur_start, cur_block))
 
     for i, (start_idx, block) in enumerate(import_blocks):
         # block: list of (index, line)
@@ -197,8 +193,7 @@ def check_z101(context: Context) -> list[Dict]:
             if stripped.startswith("from "):
                 # from X import ...
                 parts = stripped.split()
-                if len(parts) >= 2:
-                    module_name = parts[1]
+                if len(parts) >= 2: module_name = parts[1]
             elif stripped.startswith("import "):
                 # import a, b as c
                 rest = stripped[len("import "):].split(","
@@ -214,7 +209,7 @@ def check_z101(context: Context) -> list[Dict]:
             grouped.setdefault(grp, []).append((
                 line.rstrip("\n"), start_idx + idx + 1))
 
-        # If everything already ordered by descending length 
+        # If everything already ordered by descending length
         # within each section and sections in right order,
         # skip
         # Build grouped lines sorted by descending length
@@ -230,7 +225,7 @@ def check_z101(context: Context) -> list[Dict]:
             # sort by descending length of the import text
             sorted_items = sorted(items, key=lambda t:
                            len(t[0]), reverse=True)
-            grouped_sorted_texts[g] = [t[0] for t in 
+            grouped_sorted_texts[g] = [t[0] for t in
                                        sorted_items]
             correct_order.extend(grouped_sorted_texts[g])
 
@@ -241,13 +236,13 @@ def check_z101(context: Context) -> list[Dict]:
         # If not out of order overall, continue
         if current_order == correct_order: continue
 
-        # Otherwise, produce a suggestion block in Darkian 
+        # Otherwise, produce a suggestion block in Darkian
         # format
         suggestion_text = _render_darkian_block(
                           grouped_sorted_texts,
                           preserve_order)
 
-        # Build Z101 results for every line that is 
+        # Build Z101 results for every line that is
         # out-of-order (we'll flag the original positions)
         # For clarity give one aggregated result at the start
         # of the block with the suggestion
