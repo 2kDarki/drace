@@ -33,7 +33,7 @@ def _module_spec_origin(name: str) -> str | None:
             origin   = getattr(spec, "origin", None)
             builtins = ("built-in", "frozen")
             if origin is None or any_eq(builtins, eq=origin):
-                return "builtin"
+                if name not in PROOT: return "builtin"
 
             # Normalize to absolute path if it looks like a
             # filesystem path
@@ -96,7 +96,8 @@ def _classify_import(name: str, cwd: str) -> str:
     
     # Heuristic: if 'python' appears in the origin path 
     # (stdlib) -> STANDARDS
-    if "python" in origin_l and not any_in("site-packages", "dist-packages", eq=origin_l): return "STANDARDS"
+    if "python" in origin_l and not any_in("site-packages", "dist-packages", eq=origin_l):
+        return "STANDARDS"
 
     # site-packages and dist-packages indicate third-party
     if any_in("site-packages", "dist-packages", eq=origin_l)\
