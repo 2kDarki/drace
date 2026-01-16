@@ -72,8 +72,8 @@ def _classify_import(name: str, cwd: str) -> str:
 
     origin = _module_spec_origin(name)
     # If we couldn't resolve an origin, conservatively call
-    # it THIRD_PARTIES
-    if not origin: return "THIRD_PARTIES"
+    # it LOCALS
+    if not origin: return "LOCALS"
 
     # Handle special tokens
     if origin == "__future__": return "FUTURE"

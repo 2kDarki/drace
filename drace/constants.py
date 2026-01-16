@@ -4,6 +4,7 @@ import sys
 import os
 
 from tuikit.textools import style_text as color
+from tuikit.logictools import any_eq
 
 
 DEFAULTS_PATH = Path(__file__).parent / "defaults.json"
@@ -14,7 +15,9 @@ else: defaults = {}
 COLOR = defaults.get("color", True)
 if "--color" in sys.argv: COLOR = not COLOR
 
-MODE          = defaults.get("mode", "lint")
+MODES         = ["lint", "format", "score"]
+MODE          = sys.argv[1] if any_eq(MODES, sys.argv[1:]) \
+           else defaults.get("mode", "lint")
 ONLY          = defaults.get("only_rules",    None) or []
 IGNORED_RULES = defaults.get("ignored_rules", None) or []
 IGNORED_FILES = defaults.get("ignored_files", None) or []
@@ -36,9 +39,9 @@ I             = len(APP) + 1
 DRACE         = color(f"{APP} ", APP_COLOR)
 CURSOR        = color(" " * (I - 4) + ">>> ", APP_COLOR)
 SEP           = color(":", PROMPT)
-CMDS          = ["format", "lint", "score", "config"]
-KEYWORDS      = ('if ', 'for ', 'while ', 'with ', 'elif ',
-                 'else:', 'try:', 'except ', 'finally:')
+CMDS          = MODES + ["config"]
+KEYWORDS      = ("if ", "for ", "while ", "with ", "elif ",
+                 "else:", "try:", "except ", "finally:")
 
 def override(args):
     if "--score" in sys.argv: args.score = not SCORE
