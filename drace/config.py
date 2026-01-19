@@ -151,8 +151,9 @@ class Config:
                 return
             self.defaults[target] = DEFAULTS[target][1]
         else:
-            for k, v in DEFAULTS.items():
-                self.defaults[k] = v[1]
+            defaults = {}
+            for k, v in DEFAULTS.items(): defaults[k] = v[1]
+            self.defaults = defaults
         self._save()
 
 
