@@ -129,11 +129,9 @@ def _render_darkian_block(grouped_lines: dict[str,
         # add section header for non-FUTURE groups
         center = Align(offset=2).center
         if group == "STANDARDS":
-            sections.append(f"\n# {center(' STANDARDS ',
-                '=')}")
+            sections.append(f"\n# {center(' STANDARDS ', '=')}")
         elif group == "THIRD_PARTIES":
-            sections.append(f"# {center(' THIRD PARTIES ',
-                '=')}")
+            sections.append(f"# {center(' THIRD PARTIES ', '=')}")
         elif group == "LOCALS":
             sections.append(f"# {center(' LOCALS ', '=')}")
         sections.extend(lines)
