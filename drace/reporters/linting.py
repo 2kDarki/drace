@@ -45,8 +45,6 @@ def lint_cmd(path: str, score: bool, first: bool,
         if code == "Z101":
             try: msg, rest = msg.split("#", 1)
             except ValueError: rest = ""
-        else:
-            msg, rest = msg.split("#", 1)
             check_msg = msg.split(":", 1)
             if len(check_msg) > 1 and check_msg[1] != "":
                 msg = check_msg[0] + ":"
