@@ -51,25 +51,35 @@ def get_enclosing_locals(node: ast.AST) -> set[str]:
             if cur.args.kwarg:
                 visible.add(cur.args.kwarg.arg)
 
-            # Local assignments
-            for sub in cur.body:
-                if isinstance(sub, (ast.Assign,
-                        ast.AnnAssign)):
-                    targets = sub.targets if hasattr(sub,
-                              "targets") else [sub.target]
+            # Local assignments within this scope (excluding
+            # nested function/class bodies)
+            def visit(sub: ast.AST):
+                nonlocal visible
+                if sub is not cur and isinstance(sub, (
+                    ast.FunctionDef, ast.AsyncFunctionDef,
+                    ast.ClassDef, ast.Lambda
+                )):
+                    return
+
+                if isinstance(sub, (ast.Assign, ast.AnnAssign)):
+                    targets = sub.targets if hasattr(
+                        sub, "targets"
+                    ) else [sub.target]
                     for t in targets:
                         visible |= extract_names(t)
-
-                elif isinstance(sub, (ast.For,
-                        ast.AsyncFor)):
+                elif isinstance(sub, (ast.For, ast.AsyncFor)):
                     visible |= extract_names(sub.target)
-
-                elif isinstance(sub, ast.ExceptHandler) \
-                    and sub.name: visible.add(sub.name)
-
-                elif isinstance(sub, (ast.FunctionDef,
-                        ast.AsyncFunctionDef, ast.ClassDef)):
+                elif isinstance(sub, ast.ExceptHandler) and sub.name:
                     visible.add(sub.name)
+                elif isinstance(
+                    sub, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+                ):
+                    visible.add(sub.name)
+
+                for child in ast.iter_child_nodes(sub):
+                    visit(child)
+
+            visit(cur)
 
         # -------- Class scope --------
         elif isinstance(cur, ast.ClassDef):
@@ -164,6 +174,8 @@ def check_z227(context: Context) -> list[Dict]:
             # defs/classes
             local_vars: set[str] = set()
             args = node.args
+            if hasattr(node, "name"):
+                local_vars.add(node.name)
             for arg in list(args.args) + list(
                 args.kwonlyargs): local_vars.add(arg.arg)
             if args.vararg: local_vars.add(args.vararg.arg)
@@ -181,11 +193,19 @@ def check_z227(context: Context) -> list[Dict]:
                     targets = get_targets(sub)
                     for t in targets:
                         local_vars |= extract_names(t)
+                elif isinstance(sub, ast.NamedExpr):
+                    local_vars |= extract_names(sub.target)
                 elif isinstance(sub, (ast.For,
                         ast.comprehension)):
                     target = getattr(sub, "target", None)
                     if target is not None:
                         local_vars |= extract_names(target)
+                elif isinstance(sub, (ast.With, ast.AsyncWith)):
+                    for item in sub.items:
+                        if item.optional_vars is not None:
+                            local_vars |= extract_names(
+                                item.optional_vars
+                            )
                 elif isinstance(sub, ast.ExceptHandler
                     ) and sub.name: local_vars.add(sub.name)
 

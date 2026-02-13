@@ -1,11 +1,13 @@
 import ast
 
 from drace.types import Context, Dict
+from drace.constants import LINE_LEN
 from drace import utils
 
 
 CONTROL_NODE_TYPES = (ast.If, ast.For, ast.While, ast.With,
-                      ast.Try, ast.AsyncFor, ast.AsyncWith)
+                      ast.Try, ast.AsyncFor, ast.AsyncWith,
+                      ast.Match)
 
 
 def _is_comment_or_empty(line: str) -> bool:
@@ -33,9 +35,9 @@ def check_z201(context: Context) -> list[Dict]:
 
     Flags:
       - control blocks written on a single physical line whose
-        total length > utils.LINE_LEN
+        total length > LINE_LEN
       - semicolon-joined single physical lines that parse to
-        multiple statements and exceed utils.LINE_LEN
+        multiple statements and exceed LINE_LEN
 
     Conservative: uses AST to avoid false positives.
     """
@@ -64,7 +66,7 @@ def check_z201(context: Context) -> list[Dict]:
 
             col = (getattr(node, "col_offset", 0) + 1) if \
                    hasattr(node, "col_offset") else 1
-            if len(node_src) > utils.LINE_LEN:
+            if len(node_src) > LINE_LEN:
                 results.append({
                     "file": file,
                     "line": node.lineno,
@@ -80,7 +82,7 @@ def check_z201(context: Context) -> list[Dict]:
         # are, since iterating lines)
         if ";" not in raw: continue
         # Quick length check first to avoid repeated parsing
-        if len(raw) <= utils.LINE_LEN: continue
+        if len(raw) <= LINE_LEN: continue
         # Try AST parse to verify this line is truly multiple
         # statements
         if _is_semicolon_compound(raw):

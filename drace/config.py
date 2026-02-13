@@ -37,6 +37,7 @@ forgiving — in line with Drace's pragmatic philosophy.
 """
 # ========================= STANDARDS =======================
 from typing import NoReturn
+import copy
 import json
 import sys
 import os
@@ -58,9 +59,9 @@ from . import help_menu
 __doc__  = doc  # override for calls
 DEFAULTS = {
     "mode":          [str, "lint"],
-    "line_len":      [int, 79],
+    "line_len":      [int, 88],
     "max_fn_steps":  [int, 6],
-    "max_coupling":  [int, 3],
+    "max_coupling":  [int, 8],
     "wrap":          [bool, True],
     "color":         [bool, True],
     "score":         [bool, True],
@@ -103,7 +104,7 @@ class Config:
             with open(self.path) as f: return json.load(f)
 
         self.reset()
-        return self.defaults
+        return copy.deepcopy(self.defaults)
 
     def _save(self) -> None:
         """Persists the current defaults to json."""
@@ -135,7 +136,9 @@ class Config:
         Returns:
             Any: The config value or fallback.
         """
-        return self.defaults.get(key, fallback)
+        value = self.defaults.get(key, fallback)
+        if isinstance(value, (dict, list, set)): return copy.deepcopy(value)
+        return value
 
     def reset(self, target: str = "hapana"):
         """
@@ -325,6 +328,28 @@ def _handle_list(key: str, values: tuple[str | list]
     return array
 
 
+def _coerce_value(key: str, values: list[str]) -> tuple[bool, object, str]:
+    _type = DEFAULTS[key][0]
+    truthy = ["1", "true", "yeah", "yes", "y", "on", "ok"]
+    exp_list = ""
+
+    try:
+        if _type == bool:
+            value = values[0].lower() in truthy
+        elif _type == list:
+            value = _handle_list(key, values)
+        else:
+            if _type == str and values[0] not in CMDS:
+                exp_list += ", ".join(CMDS[:-1])
+                exp_list += ", or " + CMDS[-1]
+                raise ValueError
+            value = _type(values[0])
+    except (IndexError, ValueError, TypeError):
+        return False, None, exp_list or _type.__name__
+
+    return True, value, ""
+
+
 def config_cmd(args: list[str] | list) -> None:
     """
     Handles configuration commands for Drace via C9LI or
@@ -366,8 +391,7 @@ def config_cmd(args: list[str] | list) -> None:
     """
     def list_all(args: list[str]) -> bool:
         for cmd in ["list"] + list(config.defaults.keys()):
-            if args[0] == cmd and args[1] == "hapana":
-                return True
+            if args[0] == cmd and args[1] == "hapana": return True
         return False
 
     if not args: args = interactive()
@@ -387,10 +411,14 @@ def config_cmd(args: list[str] | list) -> None:
             else: transmit(f"{k} {s} {v}", _list=True)
         print(); return
 
-    if args[0] == "help": help_menu.main("config")
-    if args[0] == "reset": config.reset(args[1]); return
-
-    if args[0] == "show":
+    action = args[0]
+    if action in ("help", "reset", "show"):
+        if action == "help":
+            help_menu.main("config")
+            return
+        if action == "reset":
+            config.reset(args[1])
+            return
         try:
             key   = color(args[1], GOOD)
             value = config.get(args[1])
@@ -406,21 +434,9 @@ def config_cmd(args: list[str] | list) -> None:
         transmit(f"unknown key: {key}\n", BAD)
         return
 
-    _type    = DEFAULTS[key][0]
-    truthy   = ["1", "true", "yeah", "yes", "y", "on", "ok"]
-    exp_list = ""
-    try:
-        if _type == bool: value = values[0].lower() in truthy
-        elif _type == list: value = _handle_list(key, values)
-        else:
-            if _type == str and values[0] not in CMDS:
-                exp_list += ", ".join(CMDS[:-1])
-                exp_list += ", or " + CMDS[-1]
-                raise ValueError
-            value = _type(values[0])
-    except (IndexError, ValueError, TypeError):
-        transmit(f"Invalid value for {key}. Expected "
-               + f"{exp_list or _type.__name__}\n", BAD)
+    valid, value, expected = _coerce_value(key, values)
+    if not valid:
+        transmit(f"Invalid value for {key}. Expected {expected}\n", BAD)
         return
 
     config.set(key, value)

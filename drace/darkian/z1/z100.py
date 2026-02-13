@@ -1,113 +1,104 @@
 import ast
-import re
 
 from drace.types import Context, Dict
-from drace.constants import KEYWORDS
 
 
-_ASSIGN_RE = re.compile(r"(?<![=!<>+\-*/%&|^])=(?!=)")
+MIN_GROUP = 4
 
 
-def _find_assignment_pos(line: str) -> int | None:
-    """
-    Return column index (0-based) of the assignment '=' for
-    real assignments, or None
-    """
-    m = _ASSIGN_RE.search(line)
-    if not m: return None
-    return m.start()
+def _is_control_scope(node: ast.AST) -> bool:
+    return isinstance(
+        node,
+        (
+            ast.If,
+            ast.For,
+            ast.While,
+            ast.With,
+            ast.Try,
+            ast.Match,
+            ast.AsyncFor,
+            ast.AsyncWith,
+        ),
+    )
 
 
-def _is_simple_assignment(node: ast.AST) -> bool:
-    """
-    Return True for top-level Assign or AnnAssign statements
-    that are not inside control-flow statements
-    """
+def _is_top_level_assignment(node: ast.AST) -> bool:
     if not isinstance(node, (ast.Assign, ast.AnnAssign)):
         return False
-
-    # Walk up the parent chain to ensure it's not inside an
-    # `If`, `For`, etc.
-    control_structs = (ast.If, ast.For, ast.While, ast.With,
-                       ast.Try, ast.Match)
-    parent = getattr(node, 'parent', None)
-    while parent:
-        if isinstance(parent, ast.Module): break
-        if isinstance(parent, control_structs): return False
-        parent = getattr(parent, 'parent', None)
-
-    return True
-
-
-def _line_indentation(line: str) -> int:
-    """Count leading spaces (or tabs)."""
-    return len(line) - len(line.lstrip(' '))
-
-
-def _is_simple_assignment_line(line: str) -> bool:
-    """Naive assignment check, will improve if needed."""
-    stripped = line.lstrip()
-    # Exclude if line starts with control keyword followed by
-    # assignment
-    if any(stripped.startswith(kw) for kw in KEYWORDS):
+    if not hasattr(node, "lineno") or not hasattr(node, "end_lineno"):
+        return False
+    if node.lineno != node.end_lineno:
         return False
 
-    return '=' in stripped and not stripped.startswith('#')
+    parent = getattr(node, "parent", None)
+    if isinstance(parent, ast.Module):
+        return True
+    if _is_control_scope(parent):
+        return False
+    return False
 
 
-def _group_assignments_by_indent(assign_ln:
-        list[int], lines: list[str]) -> list[list[int]]:
-    groups        = []
-    current_group = []
-    last_indent   = None
+def _first_target(node: ast.Assign | ast.AnnAssign) -> ast.AST | None:
+    if isinstance(node, ast.Assign):
+        return node.targets[0] if node.targets else None
+    return node.target
 
-    for i, lineno in enumerate(assign_ln):
-        line = lines[lineno - 1]
-        if not _is_simple_assignment_line(line): continue
 
-        indent = _line_indentation(line)
+def _assignment_eq_col(node: ast.Assign | ast.AnnAssign, line: str) -> int | None:
+    """
+    Find the physical '=' column from an assignment AST node.
+    """
+    target = _first_target(node)
+    if target is None or not hasattr(target, "end_col_offset"):
+        return None
 
-        if not current_group:
-            current_group.append(lineno)
-            last_indent = indent
-            continue
+    start = int(getattr(target, "end_col_offset", 0))
+    if isinstance(node, ast.AnnAssign):
+        # Skip annotation part: x: int = 1
+        start = int(getattr(node.annotation, "end_col_offset", start))
 
-        prev_lineno = assign_ln[i - 1]
-        if lineno == prev_lineno + 1:
-            prev_line = lines[prev_lineno].strip()
-            if indent == last_indent and prev_line:
-                current_group.append(lineno)
-            else:
-                groups.append(current_group)
-                current_group = [lineno]
-                last_indent   = indent
+    # Look for the first standalone '=' after target/annotation.
+    idx = line.find("=", start)
+    if idx == -1:
+        return None
+    # Exclude "==" and walrus.
+    if idx > 0 and line[idx - 1] in ("=", ":"):
+        return None
+    if idx + 1 < len(line) and line[idx + 1] == "=":
+        return None
+    return idx
+
+
+def _group_assignments(
+    nodes: list[ast.Assign | ast.AnnAssign],
+) -> list[list[ast.Assign | ast.AnnAssign]]:
+    """
+    Group contiguous top-level assignments by indentation.
+    """
+    groups: list[list[ast.Assign | ast.AnnAssign]] = []
+    current: list[ast.Assign | ast.AnnAssign] = []
+    prev_lineno = None
+    prev_indent = None
+
+    for node in sorted(nodes, key=lambda n: (n.lineno, n.col_offset)):
+        if prev_lineno is None:
+            current = [node]
         else:
-            groups.append(current_group)
-            current_group = [lineno]
-            last_indent   = indent
+            contiguous = node.lineno == prev_lineno + 1
+            same_indent = node.col_offset == prev_indent
+            if contiguous and same_indent:
+                current.append(node)
+            else:
+                if current:
+                    groups.append(current)
+                current = [node]
 
-    if current_group: groups.append(current_group)
+        prev_lineno = node.lineno
+        prev_indent = node.col_offset
 
+    if current:
+        groups.append(current)
     return groups
-
-
-def _collect_assignment_lines_and_blocks(tree
-        ) -> list[tuple[int, ast.AST]]:
-    """
-    Return list of (lineno, node) for assignment-like
-    statements found in AST, sorted by lineno.
-    """
-    out = []
-
-    for node in ast.walk(tree):
-        if _is_simple_assignment(node):
-            # Some AnnAssign (x: int = 1) may not have lineno
-            # if generated; check presence
-            if hasattr(node, "lineno"):
-                out.append((node.lineno, node))
-
-    out.sort(key=lambda t: t[0])
-    return out
 
 
 def check_z100(context: Context) -> list[Dict]:
@@ -115,35 +106,38 @@ def check_z100(context: Context) -> list[Dict]:
     Z100: Enforce vertical alignment of `=` in real
           assignment blocks.
     """
-    lines     = context["lines"]
-    tree      = context["tree"]
-    file      = context["file"]
-    results   = []
-    assigns   = _collect_assignment_lines_and_blocks(tree)
-    assign_ln = [ln for ln, _ in assigns]
-    groups    = _group_assignments_by_indent(assign_ln, lines)
+    lines = context["lines"]
+    tree = context["tree"]
+    file = context["file"]
+    results: list[Dict] = []
 
-    for group in groups:
-        # build the lines corresponding to those assignment
-        # line numbers
-        eq_positions = []
-        eq_pos_map   = {}
-        for idx, ln in enumerate(group):
-            line = lines[ln - 1]
-            pos  = _find_assignment_pos(line)
-            if pos is None: continue
-            eq_positions.append(pos)
-            eq_pos_map[ln] = pos
-        if not eq_positions: continue
-        target = max(eq_positions)
-        for ln, pos in eq_pos_map.items():
-            if pos != target:
+    candidates: list[ast.Assign | ast.AnnAssign] = [
+        node for node in ast.walk(tree)
+        if _is_top_level_assignment(node)
+    ]
+
+    for group in _group_assignments(candidates):
+        if len(group) < MIN_GROUP:
+            continue
+        eq_positions: dict[int, int] = {}
+        for node in group:
+            line = lines[node.lineno - 1]
+            eq_col = _assignment_eq_col(node, line)
+            if eq_col is not None:
+                eq_positions[node.lineno] = eq_col
+
+        if len(eq_positions) < 2:
+            continue
+
+        target_col = max(eq_positions.values())
+        for lineno, col in eq_positions.items():
+            if col != target_col:
                 results.append({
                     "file": file,
-                    "line": ln,
-                    "col": pos + 1,
+                    "line": lineno,
+                    "col": col + 1,
                     "code": "Z100",
-                    "msg": "assignment not vertically aligned"
+                    "msg": "assignment not vertically aligned",
                 })
 
     return results

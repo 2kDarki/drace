@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 This module defines the command-line interface for Drace — a
-pragmatic linter and formatter for Python code.  
+pragmatic linter and formatter for Python code.
 
 It handles argument parsing and dispatches execution to the
 appropriate command module based on user input.
@@ -29,7 +29,7 @@ import sys
 import os
 
 # ========================== LOCALS =========================
-from .constants import LINE_LEN, MODE, SCORE, CMDS, override
+from .constants import MODE, SCORE, CMDS, override
 from .reporters import linting, formatting
 from .help_menu import main as drace
 from .native_lang import translate
@@ -93,14 +93,17 @@ def main() -> None | NoReturn:
     """
     Entry point for the Drace CLI
 
-    Parses command-line arguments and dispatches to the 
+    Parses command-line arguments and dispatches to the
     appropriate handler:
     - format: Formats the given file or directory
     - lint: Lints one or more Python files
     - score: Displays lint score for the given path
     - config: Opens or modifies configuration
     """
-    def workflow(run: Callable) -> int:
+    def workflow(
+        run: Callable[[str, bool, bool, bool, dict], int],
+        state: dict,
+    ) -> int:
         nonlocal exit_code
         files = utils.discover_code_files(path)
 
@@ -111,7 +114,7 @@ def main() -> None | NoReturn:
             file = str(file)
             file, discard = translate(file)
             done = i == len(files) - 1
-            try: exc = run(file, score, i == 0, done)
+            try: exc = run(file, score, i == 0, done, state)
             except KeyboardInterrupt:
                 utils.transmit("user aborted\n", utils.BAD)
                 sys.exit(1)
@@ -119,7 +122,6 @@ def main() -> None | NoReturn:
             if discard: os.remove(file)
         return exit_code
 
-    
     try:
         if sys.argv[1] not in CMDS:
             sys.argv.insert(1, MODE)
@@ -131,11 +133,16 @@ def main() -> None | NoReturn:
 
     args      = override(args)
     exit_code = 0
-    
+    lint_state = {"score": 0.0, "files": 0, "codes": set()}
+
     if args.cmd == "format":
         formatting.format_cmd(path, diff=args.diff)
     elif args.cmd in ["lint", "score"]:
-        exit_code = workflow(linting.lint_cmd)
+        exit_code = workflow(
+            lambda file, score, first, done, state:
+            linting.lint_cmd(file, score, first, done, args.cmd, state),
+            lint_state,
+        )
     elif args.cmd == "config":
         config_cmd(args.args)
 

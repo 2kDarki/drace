@@ -5,19 +5,75 @@ import ast
 import sys
 
 # ======================= THIRD-PARTIES =====================
-from tuikit.logictools import any_eq, any_in, all_in
-from tuikit.textools import Align, wrap_text, visual_width
 from tuikit.textools import transmit as _transmit
+from tuikit.textools import Align, wrap_text
 from tuikit.listools import format_order
 from tuikit.console import underline
-from tuikit.textools import pathit
 
 # ========================== LOCALS =========================
-from .constants import *
+from .constants import (
+    APP,
+    APP_COLOR,
+    BAD,
+    CMDS,
+    CURSOR,
+    DEFAULTS_PATH,
+    DRACE,
+    GOOD,
+    HOLD,
+    INDENT,
+    IGNORED_FILES,
+    PROMPT,
+    SPEED,
+    YELLOW,
+    color,
+)
 
 
 center = Align().center
-MARKER = None
+
+__all__ = [
+    "APP",
+    "APP_COLOR",
+    "BAD",
+    "CMDS",
+    "CURSOR",
+    "DEFAULTS_PATH",
+    "DRACE",
+    "GOOD",
+    "HOLD",
+    "INDENT",
+    "IGNORED_FILES",
+    "PROMPT",
+    "SPEED",
+    "YELLOW",
+    "annotate_parents",
+    "color",
+    "discover_code_files",
+    "find_proot",
+    "format_order",
+    "pc_colored",
+    "tolerant_parse_module",
+    "transmit",
+    "try_to_parse",
+    "underline",
+]
+
+# Keep re-exported constants marked as used for static analyzers.
+_EXPORTS = (
+    APP_COLOR,
+    CMDS,
+    CURSOR,
+    DEFAULTS_PATH,
+    DRACE,
+    GOOD,
+    HOLD,
+    INDENT,
+    PROMPT,
+    SPEED,
+    YELLOW,
+    BAD,
+)
 
 
 def annotate_parents(node: ast.AST, parent=None) -> None:
@@ -26,15 +82,13 @@ def annotate_parents(node: ast.AST, parent=None) -> None:
         annotate_parents(child, node)
 
 
-def _in_docstring(marker: str) -> bool:
-    global MARKER
-    marker = marker.strip()
-    if MARKER and MARKER == marker: return False
-    if MARKER and MARKER != marker: return True
-    if not MARKER and marker != '"""': return False
-    if not MARKER and marker == '"""':
-        MARKER = marker
-        return True
+def _next_docstring_state(line: str, active: bool) -> bool:
+    stripped = line.strip()
+    marker = '"""' if '"""' in stripped else "'''" if "'''" in stripped else ""
+    if not marker: return active
+
+    if stripped.count(marker) % 2 == 1: return not active
+    return active
 
 
 def _line_indent(line: str) -> int:
@@ -53,10 +107,12 @@ def _split_top_level_blocks(lines: list[str]) -> list[tuple[list[str], int]]:
     blocks       = []
     buffer       = []
     in_block     = False
+    in_docstring = False
     block_indent = 0
     start_lineno = 0
 
     for idx, line in enumerate(lines):
+        in_docstring = _next_docstring_state(line, in_docstring)
         if _is_top_level_start(line) and _line_indent(line) == 0:
             if buffer:
                 blocks.append((buffer, start_lineno))
@@ -65,7 +121,11 @@ def _split_top_level_blocks(lines: list[str]) -> list[tuple[list[str], int]]:
             block_indent = _line_indent(line)
             start_lineno = idx + 1
         elif in_block:
-            if line.strip() == "" or _in_docstring(line) or _line_indent(line) > block_indent:
+            if (
+                line.strip() == ""
+                or in_docstring
+                or _line_indent(line) > block_indent
+            ):
                 buffer.append(line)
             else:
                 blocks.append((buffer, start_lineno))
@@ -95,14 +155,14 @@ def try_to_parse(source: str) -> ast.Module | None:
     return tree
 
 
-def tolerant_parse_module(source: list[str]|str,
+def tolerant_parse_module(source: list[str] | str,
                           get: bool = False) -> ast.Module:
     if isinstance(source, str): source = source.splitlines()
     tree = try_to_parse("\n".join(source))
     if tree:
         annotate_parents(tree)
         return (tree, []) if get else tree
-    
+
     nodes   = []
     blocks  = _split_top_level_blocks(source)
     synerrs = []
@@ -128,13 +188,27 @@ def tolerant_parse_module(source: list[str]|str,
 
 def discover_code_files(path: Path) -> list[Path] | NoReturn:
     supported = [".py"]  # will expand as I learn more langs
+    ignored   = [rule for rule in IGNORED_FILES if rule]
+
+    def is_ignored(file: Path) -> bool:
+        file_s = str(file)
+        for rule in ignored:
+            if file.match(rule): return True
+            if file.name == rule: return True
+            if rule in file_s: return True
+        return False
 
     if path.is_file() and path.suffix in supported:
+        if is_ignored(path): return []
         return [path]
     elif path.is_dir():
-        sglobs = ["*"+sfx for sfx in supported]
+        sglobs = ["*" + sfx for sfx in supported]
         files  = []
-        for sglob in sglobs: files.extend(path.rglob(sglob))
+        for sglob in sglobs:
+            files.extend(
+                file for file in path.rglob(sglob)
+                if not is_ignored(file)
+            )
         return sorted(files)
 
     transmit(f"path '{path}' does not exist\n", hue=BAD)
@@ -172,6 +246,6 @@ def pc_colored(pc):
 def transmit(text: str, hue: str = PROMPT, end: str = "\n",
             _list: bool = False) -> None:
     print("        " if _list else f"{end}{DRACE}", end="")
-    text = wrap_text(text, I, inline=True, order=APP)
+    text = wrap_text(text, INDENT, inline=True, order=APP)
     speed = 0 if _list else SPEED
     _transmit(text, speed=speed, hold=HOLD, hue=hue)

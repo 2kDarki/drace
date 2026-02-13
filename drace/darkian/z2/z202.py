@@ -4,8 +4,8 @@ import math
 import ast
 
 # ========================== LOCALS =========================
+from tuikit.logictools import any_in
 from drace.types import Context, Dict
-from drace import utils
 
 
 class Canonicalizer(ast.NodeTransformer):
@@ -100,7 +100,23 @@ def canonical_block_dump(stmts: list[ast.stmt]) -> str:
     canon = Canonicalizer()
     # Create a synthetic Module containing the stmts to
     # maintain context
-    module = ast.Module(body=stmts, type_ignores=[])
+    # Reparse from source form to avoid mutating shared nodes.
+    # This is cycle-safe even when parent pointers exist.
+    cloned: list[ast.stmt] = []
+    for stmt in stmts:
+        try:
+            src = ast.unparse(stmt)
+            parsed = ast.parse(src)
+            if parsed.body:
+                cloned.append(parsed.body[0])
+        except Exception:
+            # If unparsing fails for an edge-case node, skip it.
+            return "", ""
+
+    if not cloned:
+        return "", ""
+
+    module = ast.Module(body=cloned, type_ignores=[])
     module = canon.visit(module)
     ast.fix_missing_locations(module)
 
@@ -140,7 +156,7 @@ def _is_trivial_by_line_ranges(matches: list[tuple[int, int]]
 def _is_argparse_like(dumped: str) -> bool:
     # A very rough structural match
     return dumped.count("Call(Attribute(Name(") >= 2 and \
-           utils.any_in("keyword(", "Constant(", eq=dumped)
+           any_in("keyword(", "Constant(", eq=dumped)
 
 
 def is_trivial_dump(dumped: str,
@@ -222,6 +238,8 @@ def collect_sequences(tree: ast.AST, min_len: int = 2,
                     if not has_control_flow(block): continue
 
                     h, dumped = canonical_block_dump(block)
+                    if not h:
+                        continue
                     start     = block[0].lineno
                     end       = getattr(block[-1],
                                 "end_lineno",

@@ -9,6 +9,7 @@ import sys
 import shutil
 import subprocess
 import tempfile
+import pyflakes
 
 from pyflakes.checker import PYPY
 from pyflakes.messages import UnusedImport
@@ -676,9 +677,11 @@ class IntegrationTests(TestCase):
         """
         Return the path to the pyflakes binary.
         """
-        import pyflakes
         package_dir = os.path.dirname(pyflakes.__file__)
-        return os.path.join(package_dir, '..', 'bin', 'pyflakes')
+        binary = os.path.join(package_dir, '..', 'bin', 'pyflakes')
+        if not os.path.exists(binary):
+            self.skipTest("pyflakes binary script is not available in this environment")
+        return binary
 
     def runPyflakes(self, paths, stdin=None):
         """

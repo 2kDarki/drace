@@ -17,4 +17,3 @@ def translate(path: Path) -> Path | bool:
 
     if not found: return path, False
     return api.cnat(path, lang, get=True), True
-    

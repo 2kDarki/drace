@@ -1,0 +1,1 @@
+"""Formatter command entrypoint placeholder."""

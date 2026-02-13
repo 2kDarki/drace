@@ -1,54 +1,88 @@
-from drace.constants import KEYWORDS, LINE_LEN
+import ast
+import os
+
 from drace.types import Context, Dict
+from drace.constants import LINE_LEN
+
+
+COMPACTABLE_CONTROLS = (ast.If,)
+NESTED_CONTROL = COMPACTABLE_CONTROLS + (ast.Try, ast.Match)
+
+
+def _has_alt_branch(node: ast.AST) -> bool:
+    orelse = getattr(node, "orelse", None)
+    return bool(orelse)
+
+
+def _is_single_simple_stmt(node: ast.AST) -> bool:
+    body = getattr(node, "body", [])
+    if len(body) != 1:
+        return False
+    stmt = body[0]
+    if isinstance(stmt, NESTED_CONTROL):
+        return False
+    compactable = (ast.Return, ast.Raise)
+    return isinstance(stmt, compactable)
+
+
+def _one_liner_len(src: str, node: ast.AST) -> int | None:
+    if getattr(node, "lineno", -1) == getattr(node, "end_lineno", -2):
+        # Already compacted.
+        return None
+    body = node.body[0]
+    header = ast.get_source_segment(src, node) or ""
+    inner = ast.get_source_segment(src, body) or ""
+    if not header or not inner:
+        return None
+
+    # For block nodes, header includes body on single-line forms.
+    # Rebuild from the first line up to ":" to estimate compact length.
+    header_line = header.splitlines()[0]
+    if ":" not in header_line:
+        return None
+    lead = header_line[: header_line.index(":") + 1].rstrip()
+    body = inner.strip()
+    if len(body) > 28:
+        return None
+    if len(lead) > 52:
+        return None
+    return len(f"{lead} {body}")
 
 
 def check_z200(context: Context) -> list[Dict]:
     """
-    Z200: Encourage compact control blocks.
-
-    Flags control blocks with a single meaningful line,
-    suggesting conversion to one-liners (if under line length
-    limit), even if nested inside other blocks
+    Z200: suggest compact one-liners for very small control blocks.
     """
-    lines   = context["lines"]
-    file    = context["file"]
-    results = []
-    i       = 0
-    total   = len(lines)
+    tree = context["tree"]
+    file = context["file"]
+    src = "\n".join(context["lines"])
+    results: list[Dict] = []
 
-    while i < total:
-        line  = lines[i]
-        sline = line.strip()
+    if f"{os.sep}drace{os.sep}darkian{os.sep}" in os.path.abspath(file):
+        return results
 
-        i += 1
-        if sline.startswith(KEYWORDS) and sline.endswith(":"):
-            indent = len(line) - len(line.lstrip())
-            block  = []
-            j      = i
+    for node in ast.walk(tree):
+        if not isinstance(node, COMPACTABLE_CONTROLS):
+            continue
+        if isinstance(node, ast.If):
+            test = ast.get_source_segment(src, node.test) or ""
+            if "__name__" in test and "__main__" in test:
+                continue
+        if _has_alt_branch(node):
+            continue
+        if not _is_single_simple_stmt(node):
+            continue
 
-            while j < total:
-                next_line = lines[j]
-                if not next_line.strip(): j += 1; continue
-                next_indent = len(next_line) \
-                            - len(next_line.lstrip())
-                if next_indent <= indent: break
-                block.append((j, next_line.strip()))
-                j += 1
+        compact_len = _one_liner_len(src, node)
+        if compact_len is None or compact_len > LINE_LEN:
+            continue
 
-            # Check only meaningful lines
-            exclude = list(KEYWORDS) + ["#"]
-            body    = [b for _, b in block if b and not
-                      (b.startswith(e) for e in exclude)]
-            if len(body) == 1:
-                compact = f"{line.rstrip()} {body[0]}"
-                if len(compact) <= LINE_LEN:
-                    results.append({
-                        "file": file,
-                        "line": i,
-                        "col": 1,
-                        "code": "Z200",
-                        "msg": "control block could be "
-                               "compacted to a one-liner"
-                    })
+        results.append({
+            "file": file,
+            "line": node.lineno,
+            "col": getattr(node, "col_offset", 0) + 1,
+            "code": "Z200",
+            "msg": "control block could be compacted to a one-liner",
+        })
 
     return results

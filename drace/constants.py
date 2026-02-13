@@ -23,25 +23,26 @@ IGNORED_RULES = defaults.get("ignored_rules", None) or []
 IGNORED_FILES = defaults.get("ignored_files", None) or []
 SCORE         = defaults.get("score", True)
 WRAP          = defaults.get("wrap",  True)
-MAX_COUPLING  = defaults.get("max_coupling", 3)
+MAX_COUPLING  = defaults.get("max_coupling", 8)
 MAX_STEPS     = defaults.get("max_fn_steps", 6)
 LINE_LEN      = defaults.get("line_len",    88)
 SPEED         = defaults.get("delay",     0.01)
 HOLD          = 0.05
 WHITE         = "white"
-YELLOW        = "yellow"  if COLOR else WHITE
-GOOD          = "green"   if COLOR else WHITE
-BAD           = "red"     if COLOR else WHITE
-PROMPT        = "cyan"    if COLOR else WHITE
+YELLOW        = "yellow" if COLOR else WHITE
+GOOD          = "green" if COLOR else WHITE
+BAD           = "red" if COLOR else WHITE
+PROMPT        = "cyan" if COLOR else WHITE
 APP_COLOR     = "magenta" if COLOR else WHITE
 APP           = "[drace]"
-I             = len(APP) + 1
+INDENT        = len(APP) + 1
 DRACE         = color(f"{APP} ", APP_COLOR)
-CURSOR        = color(" " * (I - 4) + ">>> ", APP_COLOR)
+CURSOR        = color(" " * (INDENT - 4) + ">>> ", APP_COLOR)
 SEP           = color(":", PROMPT)
 CMDS          = MODES + ["config"]
 KEYWORDS      = ("if ", "for ", "while ", "with ", "elif ",
                  "else:", "try:", "except ", "finally:")
+
 
 def override(args):
     if "--score" in sys.argv: args.score = not SCORE

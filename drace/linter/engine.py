@@ -1,6 +1,7 @@
 # ======================= STANDARDS =========================
 from pathlib import Path
 import io
+import os
 
 # ========================= LOCALS ==========================
 from drace.constants import IGNORED_RULES, ONLY
@@ -10,9 +11,19 @@ from .pyflakes import flake_api
 from drace import utils
 
 
-IGNORE = ("E113", "E121", "E124", "E126", "E127", "E128", 
+IGNORE = ("E113", "E121", "E124", "E126", "E127", "E128",
           "E131", "E221", "E222", "E701", "E702", "E704") \
        + tuple(IGNORED_RULES)
+
+EMBEDDED_VENDOR_PATHS = (
+    f"{os.sep}drace{os.sep}linter{os.sep}pycodestyle.py",
+    f"{os.sep}drace{os.sep}linter{os.sep}pyflakes{os.sep}",
+)
+
+
+def _is_embedded_vendor(file: str | Path) -> bool:
+    normalized = os.path.abspath(str(file))
+    return any(marker in normalized for marker in EMBEDDED_VENDOR_PATHS)
 
 
 def run_style_checks(file: str | Path) -> list[dict]:
@@ -42,7 +53,20 @@ def run_flake_checks(file: str | Path) -> list[dict]:
     """Run pyflakes checks on a file."""
     def format_flake(msg: str) -> tuple[str]:
         code = "Z999"
-        if "imported but unused" in msg: code = "W611"
+
+        checks = (
+            ("imported but unused", "W611"),
+            ("*' used; unable t", "F403"),
+            ("undefined name", "E602"),
+            ("but never used", "W612"),
+            ("f-string is", "F541"),
+        )
+        for pattern, mapped_code in checks:
+            if pattern in msg:
+                code = mapped_code
+        if "syntax error" in msg.lower():
+            code = "E001"
+
         if "star imports" in msg:
             code  = "F405"
             parts = msg.split(":")
@@ -54,11 +78,6 @@ def run_flake_checks(file: str | Path) -> list[dict]:
                 if i and i == len(stars) - 1: sep = " or"
                 s_str += f"{sep} {star.strip()}"
             msg = parts[0].replace("imports", imp) + s_str
-        if "syntax error" in msg.lower(): code = "E001"
-        if "*' used; unable t" in msg: code = "F403"
-        if "undefined name" in msg: code = "E602"
-        if "but never used" in msg: code = "W612"
-        if "f-string is" in msg: code = "F541"
 
         return code, msg
 
@@ -124,6 +143,7 @@ def run_darkian_checks(file: str | Path) -> list[dict]:
 
 def scrutinize(file: str | Path) -> list[dict]:
     """Lint a file."""
+    if _is_embedded_vendor(file): return []
     final  = []
     final += run_style_checks(file)
     final += run_flake_checks(file)
