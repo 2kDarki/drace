@@ -1,111 +1,131 @@
 from tuikit.textools import Align, wrap_text
 
 
-def wrap(doc: str, indent: int = 2) -> str:
-    return wrap_text(doc, indent, inline=True, order="   ",
-           sub_indent=4)
+def wrap(doc: str, indent: int = 0) -> str:
+    """Render wrapped prose that matches Drace's pydoc style."""
+    return wrap_text(
+        doc,
+        indent,
+        inline=True,
+        order="   ",
+        sub_indent=4,
+    )
 
 
 center = Align(offset=4).center
 
-# ========================== KITTY ==========================
+
 drace = f"""
+{center(" DRACE ", "=")}
+
 {wrap(
-    "Drace is a pragmatic Python linter and formatter that blends "
-    "opinionated style with practical analysis to help you write cleaner, "
-    "more maintainable code.",
-    0,
+    "Drace is a pragmatic Python linter and formatter focused on readability, "
+    "maintainability, and practical engineering feedback."
 )}
 
 {wrap(
-    "Unlike traditional tools that crash on invalid syntax or blindly follow "
-    "style guides, Drace is resilient, human-aware, and configurable — built "
-    "with the philosophy of The Pragmatic Programmer at its core.",
-    0,
+    "The project combines style checks, semantic checks, and custom Darkian "
+    "rules under one CLI so teams can lint, format, and score code with "
+    "consistent behavior."
 )}
 
-Key Features:
-{wrap("- Custom rule system (e.g. Z-series) with AST and token-based checks.")}
-{wrap("- Formatter designed to work with the linter to support autofixing.")}
-{wrap("- Human-friendly output: colored, aligned, and readable by default.")}
-{wrap("- Config system that's intuitive for both technical and non-technical users.")}
-{wrap("- CLI and interactive (USSD-style) interfaces.")}
-{wrap("- Handles fatal syntax errors gracefully — doesn't crash like flake8/black.")}
-{wrap("- Cross-file analysis support (e.g. for DRY violations).")}
+Capabilities:
+{wrap("- Linting pipeline that remains useful even when files contain syntax errors.", 2)}
+{wrap("- Formatter that applies rule-provided fixes, including multi-line edits.", 2)}
+{wrap("- Strict CI mode (--strict-fix) for non-zero exit when findings remain.", 2)}
+{wrap("- Score mode for quick health snapshots across files or repositories.", 2)}
+{wrap("- Config system for defaults such as line length, ignored files, and rule filters.", 2)}
 
-Philosophy:
-{wrap(
-    "Drace values clarity over blind convention, balancing PEP8 compliance "
-    "with real-world code pragmatism. It's ideal for devs who want tooling "
-    "that thinks with them, not for them.",
-    0,
-)}
+Workflow:
+{wrap("- Discover Python files from a file path or directory target.", 2)}
+{wrap("- Run style + pyflakes + Darkian checks in one pass.", 2)}
+{wrap("- Apply formatter fixes in stable bottom-up order over multiple passes.", 2)}
+{wrap("- Report findings and/or scores with readable, aligned terminal output.", 2)}
+
+Quick start:
+    drace lint src/
+    drace format src/ --diff
+    drace format src/ --strict-fix
+    drace score src/
+    drace config list
 """
 
-# =========================== CLI ===========================
+
 cli = f"""{center(" CLI ", "=")}\n
 {wrap(
-    "This module defines the command-line interface for Drace. It handles "
-    "argument parsing and dispatches execution to the appropriate command "
-    "module based on user input.",
-    0,
+    "The CLI dispatches Drace commands and shares a consistent argument model "
+    "for linting, formatting, scoring, and configuration."
 )}
 
 Commands:
-{wrap("- drace format <path>: Format code and optionally show a diff")}
-{wrap("- drace lint <path>: Lint Python files and display suggestions or warnings")}
-{wrap("- drace score <path>: Compute and display a score based on linting results")}
-{wrap(
-    "- drace config [args]: Configure default settings interactively or via "
-    "command arguments"
-)}
+{wrap("- drace lint <path> [--score] [--color]", 2)}
+{wrap("- drace format <path> [--diff] [--score] [--strict-fix] [--color]", 2)}
+{wrap("- drace score <path> [--color]", 2)}
+{wrap("- drace config [args]", 2)}
 
-Example usage:
-    drace -h/--help
-    drace lint project/
-    drace format script.py --diff
-    drace config line_len 100
+Behavior:
+{wrap("- If no command is provided, Drace uses the configured default mode.", 2)}
+{wrap("- -h/--help show a single custom help screen for the tool.", 2)}
+{wrap("- --color and --score behave as toggles relative to configured defaults.", 2)}
+{wrap("- format --strict-fix fails when unresolved findings remain after format.", 2)}
+{wrap("- format --strict-fix and --diff are mutually exclusive.", 2)}
+
+Examples:
+    drace -h
+    drace lint src/
+    drace format src/ --diff
+    drace format src/ --strict-fix
+    drace score src/
 """
 
-# ========================= CONFIG ==========================
+
 config = f"""{center(" CONFIG ", "=")}\n
 {wrap(
-    "This module provides the configuration interface for Drace — both as a "
-    "command-line utility and an interactive USSD-like menu. It supports "
-    "setting, resetting, and retrieving persistent user-defined options for "
-    "Drace's behavior",
-    0,
+    "Drace configuration supports persistent defaults via JSON and a command "
+    "interface that accepts both direct and interactive edits."
 )}
 
-Key Features:
-{wrap("- Persistent config management via a JSON file")}
-{wrap("- CLI commands to view, update, or reset individual or all config options")}
-{wrap("- USSD-style interactive interface for ease of use")}
-{wrap(
-    "- Supports type-aware casting, list manipulation (add/remove), and safe "
-    "validation"
-)}
+Keys:
+{wrap("- mode, line_len, max_fn_steps, max_coupling", 2)}
+{wrap("- wrap, color, score", 2)}
+{wrap("- only_rules, ignored_rules, ignored_files", 2)}
+{wrap("- delay", 2)}
 
-Functions:
-{wrap("- config_cmd: Entry point for handling config commands from CLI")}
-{wrap("- sanitize_args: Parses and normalizes CLI arguments")}
-{wrap("- interactive: Interactive USSD-like interface for setting config options")}
-{wrap("- _handle_list: Handles list config operations (+ append, - remove)")}
-{wrap("- list_items, choose, transmit, etc. assist in formatting and interaction")}
+Operations:
+{wrap("- List all values: drace config list", 2)}
+{wrap("- Show one value: drace config <key> or drace config show <key>", 2)}
+{wrap("- Set value: drace config <key> <value>", 2)}
+{wrap("- Reset one/all: drace config reset <key|all>", 2)}
+{wrap("- Interactive menu: drace config", 2)}
 
-Classes:
-{wrap("- Config: Manages loading, saving, setting, and resetting of config values")}
+Separators:
+{wrap("- Assignment separators: =, :, ::", 2)}
+{wrap("- List modifiers: + (append), - (remove)", 2)}
 
 Notes:
+{wrap("- Changes are persisted immediately in drace/defaults.json.", 2)}
+{wrap("- List updates normalize path fragments to stable leaf names.", 2)}
+{wrap("- The placeholder token 'hapana' is used internally for key-only lookups.", 2)}
+"""
+
+
+engine = f"""{center(" ENGINE ", "=")}\n
 {wrap(
-    "- The term 'hapana' (Shona for 'nothing') is used internally to "
-    "represent a placeholder value in scenarios where no explicit value is "
-    "given"
+    "Linting and formatting share Darkian discovery, tolerant parsing helpers, "
+    "and repository-level file discovery."
 )}
 
-{wrap(
-    "This module is designed to be user-friendly, flexible, and forgiving — "
-    "in line with Drace's pragmatic philosophy",
-    0,
-)}
+Lint stack:
+{wrap("- Style checks (Darkian-patched pycodestyle)", 2)}
+{wrap("- Pyflakes checks (mapped to Drace codes)", 2)}
+{wrap("- Darkian rule checks (Z-series functions)", 2)}
+
+Formatter stack:
+{wrap("- Collect inline fixes from check_* findings", 2)}
+{wrap("- Collect dedicated fixes_* functions", 2)}
+{wrap("- Apply valid fix payloads over repeated passes until stable", 2)}
+
+Filtering:
+{wrap("- only_rules and ignored_rules filter both linter and formatter discovery.", 2)}
+{wrap("- Embedded vendor paths are skipped from Drace findings by default.", 2)}
 """

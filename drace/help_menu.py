@@ -1,3 +1,4 @@
+"""Interactive help screens for Drace CLI and config commands."""
 # ========================= STANDARDS =======================
 import sys
 
@@ -10,6 +11,7 @@ from .utils import underline
 
 
 def main(to: str | None = None):
+    """Render Drace help screens and exit cleanly."""
     def heading():
         print(f"\n{header}\n")
 
@@ -29,6 +31,7 @@ def main(to: str | None = None):
 
 
 def drace(heading):
+    """Render the main CLI help text when a help flag is present."""
     if not any_in("-h", "--help", "-help", eq=sys.argv): return ""
     heading()
     score_help = wrap_text(
@@ -112,11 +115,14 @@ Notes:
 {notes_1}
 {notes_2}
 
-Website / Docs: Coming soon."""
+Docs:
+    README.md
+    docs/README.md"""
     print(text)
 
 
 def config():
+    """Render detailed help for `drace config`."""
     # ============ SECTION 1: CHANGING DEFAULTS =============
     print(color("Changing defaults", "", "", True, True))
 
@@ -199,7 +205,7 @@ def config():
 
     print(wrap_text(
         "• if '-' or '+' is not found when setting a list default "
-        "it will be overriden",
+        "it will be overridden",
         5,
         3,
     ))

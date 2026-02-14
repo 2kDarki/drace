@@ -1,28 +1,37 @@
 # Drace Documentation
 
-Drace is a pragmatic linter and formatter for Python.  
-It focuses on readability, maintainability, and long-term code quality rather than strict stylistic compliance.
+Drace is a pragmatic Python linter and formatter that combines:
 
-Drace does not aim to replace tools like `black` or `flake8`.  
-It aims to complement or substitute them when deeper structural feedback is desired.
+- style checks
+- semantic checks
+- rule-driven diagnostics
+- rule-driven autofix
 
-This documentation explains:
-- The philosophy behind Drace
-- The Darkian Standards it assumes
-- The Z-series rules and what they represent
-- How autofix is defined and discovered
-- How configuration and scoring work
-- Known limitations and tradeoffs
+The goal is to keep code understandable under real-world change pressure.
 
-## How to read these docs
+## Documentation map
 
-Recommended order:
-1. Philosophy
-2. Darkian Standards
-3. Z-Series Rules
-4. Engine Overview
-5. Autofix Contract
-6. Configuration
-7. Scoring
+1. `docs/philosophy.md`
+2. `docs/standards.md`
+3. `docs/rules/README.md`
+4. `docs/engine.md`
+5. `docs/autofix.md`
+6. `docs/config.md`
+7. `docs/scoring.md`
 
-Each Z-rule document explains **what the rule represents and why it exists**, not how it is implemented.
+## Quick usage reference
+
+```bash
+drace lint src/
+drace format src/
+drace format src/ --diff
+drace format src/ --strict-fix
+drace score src/
+drace config list
+```
+
+## Design intent
+
+Drace does not treat "clean code" as purely stylistic. It reports structural
+pressures such as coupling, repeated control flow, and oversized units so teams
+can improve maintainability before those pressures become defects.

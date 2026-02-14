@@ -1,40 +1,4 @@
-"""
-This module provides the configuration interface for Drace —
-both as a command-line utility and an interactive USSD-like
-menu. It supports setting, resetting, and retrieving
-persistent user-defined options for Drace's behavior.
-
-Key Features:
-- Persistent config management via a JSON file
-- CLI commands to view, update, or reset individual or all
-  config options
-- USSD-style interactive interface for ease of use
-- Supports type-aware casting, list manipulation
-  (add/remove), and safe validation
-
-Functions:
-- config_cmd: Entry point for handling config commands from
-  CLI
-- sanitize_args: Parses and normalizes CLI arguments
-- interactive: Interactive USSD-like interface for setting
-  config options
-- _handle_list: Handles list config operations (+ append, -
-  remove)
-- list_items, choose, transmit, etc. assist in formatting and
-  interaction
-
-Classes:
-- Config: Manages loading, saving, setting, and resetting of
-          config values
-
-Notes:
-- The term 'hapana' (Shona for "nothing") is used internally
-  to represent a placeholder value in scenarios where no
-  explicit value is given.
-
-This module is designed to be user-friendly, flexible, and
-forgiving — in line with Drace's pragmatic philosophy.
-"""
+"""Configuration management for Drace CLI defaults."""
 # ========================= STANDARDS =======================
 from typing import NoReturn
 import copy
@@ -361,7 +325,7 @@ def _coerce_value(key: str, values: list[str], op: str | None = None
 
 def config_cmd(args: list[str] | list) -> None:
     """
-    Handles configuration commands for Drace via C9LI or
+    Handles configuration commands for Drace via CLI or
     interactive prompt.
 
     Supports viewing, modifying, and resetting user-defined
@@ -388,7 +352,7 @@ def config_cmd(args: list[str] | list) -> None:
                                 config key
         - reset <key|all>       Reset a key or all config
                                 values to defaults
-        - help                  how help menu
+        - help                  show help menu
 
     Notes:
         - Handles type conversion based on the expected type

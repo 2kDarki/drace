@@ -1,26 +1,5 @@
 #!/usr/bin/env python3
-"""
-This module defines the command-line interface for Drace — a
-pragmatic linter and formatter for Python code.
-
-It handles argument parsing and dispatches execution to the
-appropriate command module based on user input.
-
-Commands:
-- `drace format <path>`: Format code and optionally show a
-   diff
-- `drace lint <path>`: Lint Python files and display
-   suggestions or warnings
-- `drace score <path>`: Compute and display a score based on
-   linting results
-- `drace config [args]`: Configure default settings
-  interactively or via command arguments
-
-Example usage:
-    drace lint project/
-    drace format script.py --diff
-    drace config line_len 100
-"""
+"""Command-line entrypoint for Drace."""
 # ========================= STANDARDS =======================
 from typing import NoReturn, Callable
 from pathlib import Path
@@ -43,7 +22,7 @@ __doc__ = cli
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     """
-    Parse command-line arguments for the Drace CLI
+    Parse command-line arguments for the Drace CLI.
 
     Supports four subcommands:
     - format: Format Python files with optional diff and
@@ -54,12 +33,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
       or direct)
 
     Args:
-        argv (list): List of command-line arguments
-                     (excluding program name)
+        argv (list[str]): Command-line args excluding program
+            name.
 
     Returns:
-        argparse.Namespace: Parsed arguments with attributes
-                            based on subcommand
+        argparse.Namespace: Parsed command namespace.
     """
     p   = argparse.ArgumentParser(description=drace())
     sub = p.add_subparsers(dest="cmd")
@@ -92,14 +70,10 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
 def main() -> None | NoReturn:
     """
-    Entry point for the Drace CLI
+    Entry point for the Drace CLI.
 
-    Parses command-line arguments and dispatches to the
-    appropriate handler:
-    - format: Formats the given file or directory
-    - lint: Lints one or more Python files
-    - score: Displays lint score for the given path
-    - config: Opens or modifies configuration
+    Parses command-line arguments, resolves default command
+    behavior, and dispatches to command handlers.
     """
     def workflow(
         run: Callable[[str, bool, bool, bool, dict], int],

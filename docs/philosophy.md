@@ -18,9 +18,13 @@ Drace prioritizes:
 - Readability over minimalism
 - Explicitness over cleverness
 - Structural clarity over stylistic conformity
+- Sustainable defaults over one-off clever fixes
 
 Rules are designed to **nudge**, not enforce ideology.  
 Most warnings indicate *pressure*, not errors.
+
+The formatter follows the same philosophy: apply safe, explainable edits first,
+and leave unresolved design pressure visible for review.
 
 ## The Z-series
 

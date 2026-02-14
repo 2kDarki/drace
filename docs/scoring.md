@@ -2,12 +2,21 @@
 
 The Darkian score is a heuristic metric representing code health.
 
-It is calculated by comparing:
-- Total lines of code
-- Number and severity of detected issues
+For each analyzed file, Drace computes:
 
-The score is intended as:
-- A trend indicator
-- A comparison tool between revisions
+`score = 100 * (1 - findings / lines)`
 
-It is not intended as an absolute measure of quality.
+The final score shown in CLI output is the average of per-file scores, clamped
+at `>= 0`.
+
+## What the score is good for
+
+- Tracking quality trend over time
+- Comparing one revision against another
+- Quickly spotting large regressions
+
+## What the score is not
+
+- A substitute for review
+- A complete quality definition
+- A rule to optimize blindly

@@ -1,27 +1,15 @@
-# Drace – The Pragmatic Linter & Formatter
+# Drace
 
-**Drace** is a resilient, opinionated, and user-centric linter + formatter for Python. It doesn't just enforce convention — it encourages **better code thinking**, inspired by **The Pragmatic Programmer** and real-world software philosophies.
+Drace is a pragmatic Python linter and formatter focused on readability,
+maintainability, and practical code quality signals.
 
----
+## Highlights
 
-## Features
-
-- **Resilient Parsing:** Drace won't crash on fatal syntax errors — it continues linting and shows where things broke
-- **Custom Linting Rules:** Includes pragmatic and aesthetic rules like:
-  - `Z200`: Suggests one-liners where appropriate
-  - `Z202`: Suggests refactoring for DRY-ness
-  - `Z221`: Warns about bloated functions
-  - `Z222`: Flags high external dependency usage
-- **AST-based & Rule-based Checks:** Deep analysis where needed, quick rules where not
-- **Formatter Included:** Drace has a formatter with opinionated but readable output
-- **User-Friendly Config System:**
-  - Supports CLI and interactive (USSD-like) editing
-  - Temporary overrides and persistent defaults
-- **Readable Output:**
-  - Colored, well-padded output for clarity
-  - Aligns messages visually for fast scanning
-
----
+- Lint + format + score workflows in one CLI
+- Syntax-tolerant analysis so broken files still receive useful feedback
+- Rule-driven autofix with multi-pass formatting
+- Strict CI mode via `--strict-fix`
+- Configurable defaults through `drace config`
 
 ## Installation
 
@@ -29,66 +17,55 @@
 pip install drace
 ```
 
-## Usage
-
-### Linting & Formatting
+## Quick Start
 
 ```bash
-drace lint path/to/file.py       # Lint a file
-drace format path/to/file.py     # Format a file
-drace                            # Defaults to linting current directory
+drace lint src/
+drace format src/
+drace format src/ --diff
+drace format src/ --strict-fix
+drace score src/
 ```
 
-### Scoring Code Quality
+## Configuration
 
 ```bash
-drace score path/to/dir
+drace config list
+drace config line_len 100
+drace config ignored_rules + Z221
+drace config reset all
 ```
 
-> Calculates a "Darkian Standard" score based on lines vs issues.
+Flexible separators are supported:
 
-### Configuration
-
-```bash
-drace config                    # Launch interactive (USSD-style) config
-drace config line_len 100       # Set line length limit
-drace config list               # View current config
-drace config reset              # Reset all defaults
-drace config reset line_len     # Reset a key
-```
-
-Drace allows multiple separator styles: `=`, `:`, `::`, etc:
 ```bash
 drace config line_len = 100
+drace config color :: on
 ```
----
+
+## Documentation
+
+- `docs/README.md`
+- `docs/engine.md`
+- `docs/autofix.md`
+- `docs/config.md`
+- `docs/rules/README.md`
 
 ## Philosophy
 
-Drace is **pragmatic-first**. It values **readability**, **clarity**, and **real-world coding sensibilities** over strict adherence to PEP8. It helps you write code that's both clean and thoughtful.
-
-Unlike tools like `flake8` or `black`, Drace:
-- Handles broken files gracefully
-- Suggests deeper improvements (e.g., cohesion, function size)
-- Doesn't treat aesthetics and logic as separate
-
----
+Drace emphasizes structure over cosmetic compliance. It flags maintainability
+pressure early so teams can keep code easy to understand and safe to change.
 
 ## Limitations
 
-- **Slower than others:** Due to deep AST analysis and graceful error handling, Drace may take its time (about 2 seconds longer) on large, nested files
-- **Currently Python-only**: But support for other languages might arrive as I learn them (Go will probably be supported soon)
-- **Opinionated:** May conflict with pure PEP8 setups
-
----
+- Python-focused tooling
+- Deeper analysis may be slower than style-only linters
+- Opinionated defaults may differ from strict PEP8-only setups
 
 ## License
 
-Drace is free to use, modify, and distribute. See [LICENSE](LICENSE)
+MIT. See `LICENSE`.
 
----
+## Contributing
 
-## [Contributing](CONTRIBUTING.md)
-
-Have suggestions or want to add new rules?  
-Pull requests and ideas welcome — Drace is built to grow.
+See `CONTRIBUTING.md`.

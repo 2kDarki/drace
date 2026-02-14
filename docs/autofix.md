@@ -28,6 +28,16 @@ Supported operations:
 - Semantics: replace inclusive 1-based line range `[start, end]` with a list
   of strings
 
+## Validation rules
+
+Invalid or incomplete fix payloads are ignored safely. Examples:
+
+- missing `op`
+- non-string `content` for `replace_line`
+- non-list `content` for `replace_block`
+- out-of-range line numbers
+- non-monotonic block ranges (`end < start`)
+
 ## Rule authoring guide
 
 Use either pattern:
@@ -56,6 +66,7 @@ def fixes_z999(context):
 - Fixes are applied from bottom to top to reduce line-shift conflicts.
 - Formatter runs multiple passes; if no changes occur, it stops.
 - Rules without fixes still lint normally and do not affect formatting.
+- In `--diff` mode, output is printed without writing files.
 
 ## Strict CI mode
 

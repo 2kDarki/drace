@@ -11,3 +11,16 @@ Every rule description answers:
 Implementation details are intentionally excluded.
 
 Rules are meant to be understood, not memorized.
+
+## Range overview
+
+- `Z100-Z199`: Layout and visual structure
+- `Z200-Z219`: Control-flow density and readability pressure
+- `Z220-Z239`: Design concerns such as coupling, API shape, and cohesion
+- `Z900+`: Tool-level or meta diagnostics
+
+Use rule docs to decide whether to:
+
+1. apply formatting-only fixes
+2. refactor design surfaces
+3. tune rule scope with `only_rules` / `ignored_rules`

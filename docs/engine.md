@@ -1,22 +1,33 @@
 # Linting Engine Overview
 
-Drace processes files in layered stages:
+Drace runs a layered lint pipeline per file:
 
-1. Syntax-tolerant parsing
-2. Style and structural checks
-3. Semantic analysis
-4. Darkian rule evaluation
+1. `pycodestyle` checks (patched vendor copy)
+2. `pyflakes` checks (mapped to Drace-style codes/messages)
+3. Darkian rule checks (`check_*` in `drace/darkian/**`)
 
-Failures at one stage do not halt subsequent analysis.
+Results are merged and sorted by `(line, col)` before reporting.
 
-This allows Drace to provide feedback even on incomplete or broken files.
+## Syntax resilience
 
-## Shared Rule Source
+Drace uses tolerant parsing helpers so syntax errors do not stop all analysis.
+This is why a file can still receive useful design/readability findings even
+when it contains invalid Python in one region.
 
-Linting and formatting both load Darkian rules from the same discovery layer.
+## Rule discovery contract
 
-- `check_*` functions are loaded as lint rules
-- `fixes_*` functions are loaded as formatter fixers
-- `check_*` findings may also carry inline `fix` payloads
+Darkian discovery is dynamic and shared by lint + format:
 
-See `docs/autofix.md` for the fix payload contract.
+- `check_*` callables become lint checks
+- `fixes_*` callables become formatter fixers
+- `check_*` findings may also include inline `fix` payloads
+
+Filtering:
+
+- `only_rules` limits discovery to selected rule codes
+- `ignored_rules` excludes selected rule codes
+
+## Vendor exclusion behavior
+
+Embedded vendor code under Drace's own vendored linter paths is skipped by
+Drace's own diagnostics so internal copies do not pollute project output.

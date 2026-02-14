@@ -2,9 +2,13 @@ from . import docs
 
 
 __doc__ = f"""
-A Pragmatic and Resilient Linter & Formatter\n
-{docs.drace}\n
-{docs.cli}\n
-{docs.config}\n
+Drace package.
+
+{docs.drace}
+
+{docs.cli}
+
+{docs.config}
+
+{docs.engine}
 """
-# will add more docs
