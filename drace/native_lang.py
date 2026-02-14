@@ -3,15 +3,15 @@ from pathlib import Path
 from cnat import api
 
 
-def translate(path: Path) -> Path | bool:
+def translate(path: str | Path) -> tuple[str | Path, bool]:
     found = False
 
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         for line in f:
             if not line.startswith("#"): continue
             if "@natlang" in line:
                 try:
-                    lang  = line.split(":::")[1]
+                    lang  = line.split(":::", 1)[1].strip()
                     found = True
                 except IndexError: pass
 

@@ -4,7 +4,7 @@ from pathlib import Path
 import importlib
 
 # ========================= LOCALS ==========================
-from drace.types import Context, Dict
+from drace.types import Context, Dict, Fix
 
 
 ROOT = Path(__file__).resolve().parent
@@ -57,3 +57,47 @@ def get_rules(
                     rules.append(fn)
 
     return rules
+
+
+def get_fixers(
+    ignore: tuple[str, ...],
+    only: list[str],
+) -> list[Callable[[Context], list[Fix]]]:
+    """
+    Dynamically discover and load formatter fixer functions.
+
+    Discovery rules:
+    - Mirrors `get_rules` module filtering (`ignore`/`only`).
+    - Registers callables prefixed with `fixes_`.
+    """
+    ignore_set = {name.upper() for name in ignore}
+    only_set = {name.upper() for name in only}
+    fixers: list[Callable[[Context], list[Fix]]] = []
+
+    for series_dir in sorted(ROOT.iterdir()):
+        if not series_dir.is_dir() or _is_private(series_dir.name):
+            continue
+
+        for module_file in sorted(series_dir.iterdir()):
+            if not module_file.is_file() or module_file.suffix != ".py":
+                continue
+            if _is_private(module_file.name):
+                continue
+
+            code = module_file.stem.upper()
+            if only_set and code not in only_set:
+                continue
+            if code in ignore_set:
+                continue
+
+            module = importlib.import_module(
+                f"{__package__}.{series_dir.name}.{module_file.stem}"
+            )
+            for attr in sorted(dir(module)):
+                if not attr.startswith("fixes_"):
+                    continue
+                fn = getattr(module, attr)
+                if callable(fn):
+                    fixers.append(fn)
+
+    return fixers

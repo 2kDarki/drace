@@ -10,6 +10,7 @@ This documentation explains:
 - The philosophy behind Drace
 - The Darkian Standards it assumes
 - The Z-series rules and what they represent
+- How autofix is defined and discovered
 - How configuration and scoring work
 - Known limitations and tradeoffs
 
@@ -20,7 +21,8 @@ Recommended order:
 2. Darkian Standards
 3. Z-Series Rules
 4. Engine Overview
-5. Configuration
-6. Scoring
+5. Autofix Contract
+6. Configuration
+7. Scoring
 
 Each Z-rule document explains **what the rule represents and why it exists**, not how it is implemented.

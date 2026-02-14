@@ -88,7 +88,7 @@ Drace is free to use, modify, and distribute. See [LICENSE](LICENSE)
 
 ---
 
-## [Contributing](contributing.md)
+## [Contributing](CONTRIBUTING.md)
 
 Have suggestions or want to add new rules?  
 Pull requests and ideas welcome — Drace is built to grow.

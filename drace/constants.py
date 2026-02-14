@@ -9,7 +9,8 @@ from tuikit.logictools import any_eq
 
 DEFAULTS_PATH = Path(__file__).parent / "defaults.json"
 if os.path.exists(DEFAULTS_PATH):
-    with open(DEFAULTS_PATH) as f: defaults = json.load(f)
+    with open(DEFAULTS_PATH, encoding="utf-8") as f:
+        defaults = json.load(f)
 else: defaults = {}
 
 COLOR = defaults.get("color", True)

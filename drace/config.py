@@ -101,14 +101,15 @@ class Config:
             dict: The active configurations
         """
         if os.path.exists(self.path):
-            with open(self.path) as f: return json.load(f)
+            with open(self.path, encoding="utf-8") as f:
+                return json.load(f)
 
         self.reset()
         return copy.deepcopy(self.defaults)
 
     def _save(self) -> None:
         """Persists the current defaults to json."""
-        with open(self.path, 'w') as f:
+        with open(self.path, 'w', encoding="utf-8") as f:
             json.dump(self.defaults, f)
 
     def set(self, key: str, value: int | float | bool | list):
@@ -159,15 +160,14 @@ class Config:
         self._save()
 
 
-def sanitize_args(args) -> list[str] | NoReturn:
+def sanitize_args(args) -> tuple[list[str], str | None] | NoReturn:
     """
     Normalizes and interprets CLI arguments for `drace
     config`.
 
     Handles flexible separators (`=`, `:`, `+`, `-`) and
     reconstructs input into a standard [key, value(s)]
-    format. Also simulates modifier flags (`+`, `-`) by
-    appending them to `sys.argv` for later checks.
+    format.
 
     Special handling for:
       - Single argument lookups (e.g. `drace config wrap`)
@@ -188,15 +188,19 @@ def sanitize_args(args) -> list[str] | NoReturn:
                      command
 
     Returns:
-        list: A cleaned list of [key, value(s)] or control
-              command
+        tuple[list, str|None]: A cleaned list of [key,
+            value(s)] (or control command) plus optional list
+            op (`+`/`-`)
     """
     sep = ["=", ":", "+", "-"]
+    op = None
 
     if args:
         if len(args) > 2:
             clean = [args[0]]
             if any_in(sep, eq=args[1]):
+                if args[1] in ["+", "-"]:
+                    op = args[1]
                 if len(args) > 3: clean.append(args[2:])
                 else: clean.append(args[2])
             else: clean.append(args[1:])
@@ -207,13 +211,18 @@ def sanitize_args(args) -> list[str] | NoReturn:
                 # allow for an arbitrary number of separators
                 for s in sep:
                     if s in arg:
-                        sys.argv.append(s)
+                        if s in ["+", "-"]:
+                            op = s
                         s  *= arg.count(s)
                         arg = arg.replace(s, "")
                 clean.append(arg)
             args = clean
         else:
             if any_in(sep, eq=args[0]):
+                if "+" in args[0]:
+                    op = "+"
+                elif "-" in args[0]:
+                    op = "-"
                 # allow for an arbitrary number of separators
                 sep[0] *= max(args[0].count("="), 1)
                 sep[1] *= max(args[0].count(":"), 1)
@@ -234,7 +243,7 @@ def sanitize_args(args) -> list[str] | NoReturn:
             args[1] = args[1].split()
             if len(args[1]) == 1: args[1] = args[1][0]
 
-    return args
+    return args, op
 
 
 def interactive() -> list[str] | NoReturn:
@@ -280,16 +289,16 @@ def interactive() -> list[str] | NoReturn:
     return [option, new]
 
 
-def _handle_list(key: str, values: tuple[str | list]
-                ) -> list[str] | None:
+def _handle_list(key: str, values: tuple[str | list],
+                 op: str | None = None) -> list[str] | None:
     """
     Handles list-type config value manipulation (set, add,
     remove).
 
     Determines whether to:
       - replace the entire list,
-      - append new values (if '+' present in sys.argv),
-      - remove specified values (if '-' present in sys.argv)
+      - append new values (`op='+'`)
+      - remove specified values (`op='-'`)
 
     Args:
         key (str): The config key being modified
@@ -300,8 +309,7 @@ def _handle_list(key: str, values: tuple[str | list]
                      None if resulting list is empty
 
     Notes:
-        - Values are extended or removed based on presence of
-          '+' or '-' in sys.argv
+        - Values are extended or removed based on `op`
         - If the final list contains only one empty string,
           it's interpreted as None
     """
@@ -310,9 +318,9 @@ def _handle_list(key: str, values: tuple[str | list]
 
     array = config.get(key) or []
 
-    if "+" in " ".join(sys.argv):  # append
+    if op == "+":  # append
         array.extend(value)
-    elif "-" in " ".join(sys.argv):  # remove
+    elif op == "-":  # remove
         for val in values:
             try: array.remove(val)
             except ValueError: pass
@@ -328,7 +336,8 @@ def _handle_list(key: str, values: tuple[str | list]
     return array
 
 
-def _coerce_value(key: str, values: list[str]) -> tuple[bool, object, str]:
+def _coerce_value(key: str, values: list[str], op: str | None = None
+                 ) -> tuple[bool, object, str]:
     _type = DEFAULTS[key][0]
     truthy = ["1", "true", "yeah", "yes", "y", "on", "ok"]
     exp_list = ""
@@ -337,7 +346,7 @@ def _coerce_value(key: str, values: list[str]) -> tuple[bool, object, str]:
         if _type == bool:
             value = values[0].lower() in truthy
         elif _type == list:
-            value = _handle_list(key, values)
+            value = _handle_list(key, values, op)
         else:
             if _type == str and values[0] not in CMDS:
                 exp_list += ", ".join(CMDS[:-1])
@@ -396,7 +405,7 @@ def config_cmd(args: list[str] | list) -> None:
 
     if not args: args = interactive()
 
-    args = sanitize_args(args)
+    args, op = sanitize_args(args)
 
     if list_all(args):
         transmit("config:")
@@ -434,7 +443,7 @@ def config_cmd(args: list[str] | list) -> None:
         transmit(f"unknown key: {key}\n", BAD)
         return
 
-    valid, value, expected = _coerce_value(key, values)
+    valid, value, expected = _coerce_value(key, values, op)
     if not valid:
         transmit(f"Invalid value for {key}. Expected {expected}\n", BAD)
         return

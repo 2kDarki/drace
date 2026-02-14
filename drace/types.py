@@ -14,3 +14,11 @@ class Dict(TypedDict):
     col:  int
     code: str
     msg:  str
+
+
+class Fix(TypedDict, total=False):
+    op: str
+    line: int
+    start: int
+    end: int
+    content: str | list[str]

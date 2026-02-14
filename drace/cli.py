@@ -69,6 +69,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     fmt.add_argument("path")
     fmt.add_argument("--diff", action="store_true")
     fmt.add_argument("--score", nargs="?", default=SCORE)
+    fmt.add_argument("--strict-fix", action="store_true")
     fmt.add_argument("--color", action="store_true")
 
     # linter
@@ -122,10 +123,11 @@ def main() -> None | NoReturn:
             if discard: os.remove(file)
         return exit_code
 
-    try:
-        if sys.argv[1] not in CMDS:
-            sys.argv.insert(1, MODE)
-    except IndexError: sys.argv.extend([MODE, "."])
+    help_flags = {"-h", "--help", "-help"}
+    if len(sys.argv) == 1:
+        sys.argv.extend([MODE, "."])
+    elif sys.argv[1] not in CMDS and sys.argv[1] not in help_flags:
+        sys.argv.insert(1, MODE)
 
     args = parse_args(sys.argv[1:])
     try: path = Path(args.path)
@@ -136,7 +138,23 @@ def main() -> None | NoReturn:
     lint_state = {"score": 0.0, "files": 0, "codes": set()}
 
     if args.cmd == "format":
-        formatting.format_cmd(path, diff=args.diff)
+        formatting.format_cmd(path, diff=args.diff, score=args.score)
+        if args.strict_fix:
+            if args.diff:
+                utils.transmit(
+                    "--strict-fix cannot be combined with --diff\n",
+                    utils.BAD,
+                )
+                exit_code = 1
+            else:
+                unresolved = formatting.count_unresolved(path)
+                if unresolved:
+                    utils.transmit(
+                        "strict-fix failed: "
+                        f"{unresolved} unresolved finding(s)\n",
+                        utils.BAD,
+                    )
+                    exit_code = 1
     elif args.cmd in ["lint", "score"]:
         exit_code = workflow(
             lambda file, score, first, done, state:

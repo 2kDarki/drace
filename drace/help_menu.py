@@ -29,7 +29,7 @@ def main(to: str | None = None):
 
 
 def drace(heading):
-    if not any_in("-h", "-help", eq=sys.argv): return ""
+    if not any_in("-h", "--help", "-help", eq=sys.argv): return ""
     heading()
     score_help = wrap_text(
         "Toggle score after linting or formatting; relative to default set",
@@ -45,6 +45,12 @@ def drace(heading):
     )
     diff_help = wrap_text(
         "Show diff instead of modifying files (used with format)",
+        18,
+        inline=True,
+        order="                  ",
+    )
+    strict_help = wrap_text(
+        "Fail if findings remain after format (CI gate; format only)",
         18,
         inline=True,
         order="                  ",
@@ -76,11 +82,11 @@ Commands:
         3,
         3,
     )}
-   Example: drace lint format src/
+   Example: drace lint src/
 
 2. format
 {wrap_text("Format Python files using Drace’s code styling rules.", 3, 3)}
-   Example: drace myfile.py --diff
+   Example: drace format myfile.py --diff
 
 3. score
 {wrap_text("Calculate a linting score based on rules triggered.", 3, 3)}
@@ -96,6 +102,7 @@ Common Options:
   --score         {score_help}
   --color         {color_help}
   --diff          {diff_help}
+  --strict-fix    {strict_help}
   -h, --help      {help_help}
 
 Config Usage:
@@ -127,7 +134,7 @@ def config():
     print(color("\n  2. Examples:", GOOD))
     print("   • drace config line_len 59")
     print("   • drace config color :: on")
-    print("   • kityy config score====yes")
+    print("   • drace config score====yes")
     print("   • drace config ignored_rules + Z100 Z200...\n")
 
     # ============ SECTION 2: RESETTING DEFAULTS ============

@@ -1,3 +1,3 @@
-from kitty.cli import main
+from drace.cli import main
 
 if __name__ == "__main__": main()

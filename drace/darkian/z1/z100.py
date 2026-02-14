@@ -1,6 +1,6 @@
 import ast
 
-from drace.types import Context, Dict
+from drace.types import Context, Dict, Fix
 
 
 MIN_GROUP = 4
@@ -101,6 +101,61 @@ def _group_assignments(
     return groups
 
 
+def _render_aligned_line(line: str, current_col: int, target_col: int) -> str:
+    if current_col == target_col:
+        if current_col + 1 < len(line) and line[current_col + 1] != " ":
+            left = line[: current_col + 1]
+            right = line[current_col + 1 :].lstrip()
+            return f"{left} {right}"
+        return line
+
+    left = line[:current_col].rstrip()
+    right = line[current_col + 1 :].lstrip()
+    padding = max(target_col - len(left), 1)
+    return f"{left}{' ' * padding}= {right}"
+
+
+def fixes_z100(context: Context) -> list[Fix]:
+    lines = context["lines"]
+    tree = context["tree"]
+    fixes: list[Fix] = []
+
+    candidates: list[ast.Assign | ast.AnnAssign] = [
+        node for node in ast.walk(tree)
+        if _is_top_level_assignment(node)
+    ]
+
+    for group in _group_assignments(candidates):
+        if len(group) < MIN_GROUP:
+            continue
+
+        eq_positions: dict[int, int] = {}
+        for node in group:
+            line = lines[node.lineno - 1]
+            eq_col = _assignment_eq_col(node, line)
+            if eq_col is not None:
+                eq_positions[node.lineno] = eq_col
+
+        if len(eq_positions) < 2:
+            continue
+
+        target_col = max(eq_positions.values())
+        if not any(col != target_col for col in eq_positions.values()):
+            continue
+
+        for lineno, col in eq_positions.items():
+            line = lines[lineno - 1]
+            fixed = _render_aligned_line(line, col, target_col)
+            if fixed != line:
+                fixes.append({
+                    "op": "replace_line",
+                    "line": lineno,
+                    "content": fixed,
+                })
+
+    return fixes
+
+
 def check_z100(context: Context) -> list[Dict]:
     """
     Z100: Enforce vertical alignment of `=` in real
@@ -110,6 +165,11 @@ def check_z100(context: Context) -> list[Dict]:
     tree = context["tree"]
     file = context["file"]
     results: list[Dict] = []
+    fixes_by_line = {
+        int(fix["line"]): fix
+        for fix in fixes_z100(context)
+        if fix.get("op") == "replace_line" and isinstance(fix.get("line"), int)
+    }
 
     candidates: list[ast.Assign | ast.AnnAssign] = [
         node for node in ast.walk(tree)
@@ -132,12 +192,14 @@ def check_z100(context: Context) -> list[Dict]:
         target_col = max(eq_positions.values())
         for lineno, col in eq_positions.items():
             if col != target_col:
+                fix = fixes_by_line.get(lineno)
                 results.append({
                     "file": file,
                     "line": lineno,
                     "col": col + 1,
                     "code": "Z100",
                     "msg": "assignment not vertically aligned",
+                    "fix": fix or {},
                 })
 
     return results

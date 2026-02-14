@@ -5,7 +5,7 @@ import sys
 import os
 
 from drace.utils import Align, find_proot
-from drace.types import Context, Dict
+from drace.types import Context, Dict, Fix
 
 
 GROUPS = ("FUTURE", "STANDARDS", "THIRD_PARTIES", "LOCALS")
@@ -126,6 +126,20 @@ def _collect_import_blocks(lines: list[str]) -> list[tuple[int, list[str]]]:
     return blocks
 
 
+def _replacement_block(grouped: dict[str, list[str]]) -> list[str]:
+    replacement: list[str] = []
+    non_empty_groups = 0
+    for group in GROUPS:
+        items = sorted(grouped[group], key=len, reverse=True)
+        if not items:
+            continue
+        if non_empty_groups:
+            replacement.append("")
+        replacement.extend(items)
+        non_empty_groups += 1
+    return replacement
+
+
 def check_z101(context: Context) -> list[Dict]:
     """
     Z101: enforce Darkian import block ordering.
@@ -156,6 +170,13 @@ def check_z101(context: Context) -> list[Dict]:
             continue
 
         suggestion = _render_darkian_block(expected_grouped)
+        replacement = _replacement_block(grouped)
+        fix: Fix = {
+            "op": "replace_block",
+            "start": start_idx + 1,
+            "end": start_idx + len(block),
+            "content": replacement,
+        }
         results.append({
             "file": file,
             "line": start_idx + 1,
@@ -166,6 +187,7 @@ def check_z101(context: Context) -> list[Dict]:
                 "(grouped + descending line length).#\n"
                 f"{suggestion}"
             ),
+            "fix": fix,
         })
 
     return results
