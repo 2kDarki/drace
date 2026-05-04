@@ -6,8 +6,7 @@ For each analyzed file, Drace computes:
 
 `score = 100 * (1 - findings / lines)`
 
-The final score shown in CLI output is the average of per-file scores, clamped
-at `>= 0`.
+The final score shown in CLI output is the average of per-file scores, clamped at `>= 0`.
 
 ## What the score is good for
 

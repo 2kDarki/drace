@@ -21,8 +21,7 @@ def _is_single_simple_stmt(node: ast.AST) -> bool:
     stmt = body[0]
     if isinstance(stmt, NESTED_CONTROL):
         return False
-    compactable = (ast.Return, ast.Raise)
-    return isinstance(stmt, compactable)
+    return True
 
 
 def _one_liner_len(src: str, node: ast.AST) -> int | None:
@@ -30,8 +29,8 @@ def _one_liner_len(src: str, node: ast.AST) -> int | None:
         # Already compacted.
         return None
     body = node.body[0]
-    header = ast.get_source_segment(src, node) or ""
-    inner = ast.get_source_segment(src, body) or ""
+    header = ast.get_source_segment(src, node, padded=True) or ""
+    inner = ast.get_source_segment(src, body, padded=True) or ""
     if not header or not inner:
         return None
 

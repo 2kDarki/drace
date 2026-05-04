@@ -23,8 +23,7 @@ Drace prioritizes:
 Rules are designed to **nudge**, not enforce ideology.  
 Most warnings indicate *pressure*, not errors.
 
-The formatter follows the same philosophy: apply safe, explainable edits first,
-and leave unresolved design pressure visible for review.
+The formatter follows the same philosophy: apply safe, explainable edits first, and leave unresolved design pressure visible for review.
 
 ## The Z-series
 
@@ -33,6 +32,5 @@ Z-series rules are grouped signals that reflect different dimensions of code qua
 - **Z100–Z199**: Structural layout and visual consistency
 - **Z200–Z219**: Control flow density and readability
 - **Z220–Z239**: Design pressure, coupling, and cohesion
-- **Z900+**: Meta and tool-level diagnostics
 
 Each rule exists because the absence of structure eventually becomes a cost.

@@ -56,7 +56,7 @@ __all__ = [
     "tolerant_parse_module",
     "transmit",
     "try_to_parse",
-    "underline",
+    "underline"
 ]
 
 # Keep re-exported constants marked as used for static analyzers.
@@ -73,6 +73,7 @@ _EXPORTS = (
     SPEED,
     YELLOW,
     BAD,
+    underline
 )
 
 
@@ -221,7 +222,7 @@ def find_proot(path: Path) -> str:
 
     markers = {
         ".git", "pyproject.toml", "setup.py", "setup.cfg",
-        "requirements.txt", ".pdm.toml", "Pipfile"
+        "requirements.txt", ".pdm.toml", "Pipfile", "LICENSE"
     }
 
     for parent in [path, *path.parents]:

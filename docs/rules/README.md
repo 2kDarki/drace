@@ -17,7 +17,7 @@ Rules are meant to be understood, not memorized.
 - `Z100-Z199`: Layout and visual structure
 - `Z200-Z219`: Control-flow density and readability pressure
 - `Z220-Z239`: Design concerns such as coupling, API shape, and cohesion
-- `Z900+`: Tool-level or meta diagnostics
+- `Z999`: Placeholder for uncoded rules
 
 Use rule docs to decide whether to:
 

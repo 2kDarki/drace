@@ -32,6 +32,4 @@ drace config list
 
 ## Design intent
 
-Drace does not treat "clean code" as purely stylistic. It reports structural
-pressures such as coupling, repeated control flow, and oversized units so teams
-can improve maintainability before those pressures become defects.
+Drace does not treat "clean code" as purely stylistic. It reports structural pressures such as coupling, repeated control flow, and oversized units so teams can improve maintainability before those pressures become defects.

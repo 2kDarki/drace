@@ -10,9 +10,7 @@ Results are merged and sorted by `(line, col)` before reporting.
 
 ## Syntax resilience
 
-Drace uses tolerant parsing helpers so syntax errors do not stop all analysis.
-This is why a file can still receive useful design/readability findings even
-when it contains invalid Python in one region.
+Drace uses tolerant parsing helpers so syntax errors do not stop all analysis. This is why a file can still receive useful design/readability findings even when it contains invalid Python in one region.
 
 ## Rule discovery contract
 
@@ -29,5 +27,4 @@ Filtering:
 
 ## Vendor exclusion behavior
 
-Embedded vendor code under Drace's own vendored linter paths is skipped by
-Drace's own diagnostics so internal copies do not pollute project output.
+Embedded vendor code under Drace's own vendored linter paths is skipped by Drace's own diagnostics so internal copies do not pollute project output.

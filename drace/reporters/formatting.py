@@ -1,16 +1,14 @@
-from __future__ import annotations
-
 from collections.abc import Callable
 from pathlib import Path
 import difflib
 import os
 
-from drace import utils
 from drace.constants import BAD, COLOR, GOOD, PROMPT, YELLOW
-from drace.darkian import get_fixers, get_rules
-from drace.linter import engine
-from drace.types import Context, Dict, Fix
 from drace.utils import color, pc_colored, transmit
+from drace.darkian import get_fixers, get_rules
+from drace.types import Context, Dict, Fix
+from drace.linter import engine
+from drace import utils
 
 
 def _build_context(lines: list[str], file: str) -> Context:
@@ -46,7 +44,7 @@ def _collect_fixes(
 def _fix_span(fix: Fix) -> tuple[int, int]:
     if fix["op"] == "replace_block":
         start = int(fix.get("start", 1))
-        end = int(fix.get("end", start))
+        end   = int(fix.get("end", start))
         return start, end
 
     line = int(fix.get("line", 1))
@@ -60,7 +58,7 @@ def _apply_fixes(lines: list[str], fixes: list[Fix]) -> list[str]:
     for fix in ordered:
         op = fix["op"]
         if op == "replace_line":
-            line = int(fix.get("line", 0))
+            line    = int(fix.get("line", 0))
             content = fix.get("content")
             if not isinstance(content, str) or line < 1 or line > len(updated):
                 continue
@@ -68,8 +66,8 @@ def _apply_fixes(lines: list[str], fixes: list[Fix]) -> list[str]:
             continue
 
         if op == "replace_block":
-            start = int(fix.get("start", 0))
-            end = int(fix.get("end", 0))
+            start   = int(fix.get("start", 0))
+            end     = int(fix.get("end", 0))
             content = fix.get("content")
             if (
                 not isinstance(content, list)
@@ -79,7 +77,7 @@ def _apply_fixes(lines: list[str], fixes: list[Fix]) -> list[str]:
                 or not all(isinstance(item, str) for item in content)
             ):
                 continue
-            updated[start - 1 : end] = content
+            updated[start - 1: end] = content
 
     return updated
 
@@ -92,11 +90,11 @@ def _format_source(
     max_passes: int = 4,
 ) -> str:
     has_trailing_newline = text.endswith("\n")
-    lines = text.splitlines()
+    lines                = text.splitlines()
 
     for _ in range(max_passes):
         context = _build_context(lines, file)
-        fixes = _collect_fixes(context, rules, fixers)
+        fixes   = _collect_fixes(context, rules, fixers)
         if not fixes:
             break
 
@@ -112,9 +110,9 @@ def _format_source(
 
 
 def _print_diff(file: str, original: str, formatted: str) -> None:
-    original_lines = original.splitlines(keepends=True)
+    original_lines  = original.splitlines(keepends=True)
     formatted_lines = formatted.splitlines(keepends=True)
-    rel = os.path.relpath(file, start=os.getcwd())
+    rel             = os.path.relpath(file, start=os.getcwd())
     diff = difflib.unified_diff(
         original_lines,
         formatted_lines,
@@ -144,9 +142,9 @@ def _score_files(files: list[Path]) -> None:
         file_str = str(file)
         if engine._is_embedded_vendor(file_str):
             continue
-        results = engine.scrutinize(file_str)
+        results    = engine.scrutinize(file_str)
         all_issues = len(results)
-        all_lines = 1
+        all_lines  = 1
         if results:
             with open(file_str, encoding="utf-8") as handle:
                 all_lines = sum(1 for _ in handle)
@@ -158,8 +156,8 @@ def _score_files(files: list[Path]) -> None:
 
 
 def count_unresolved(path: Path | str) -> int:
-    path = Path(path)
-    files = utils.discover_code_files(path)
+    path       = Path(path)
+    files      = utils.discover_code_files(path)
     unresolved = 0
     for file in files:
         file_str = str(file)
@@ -170,10 +168,10 @@ def count_unresolved(path: Path | str) -> int:
 
 
 def format_cmd(path: Path | str, diff: bool = False, score: bool = False) -> int:
-    path = Path(path)
-    files = utils.discover_code_files(path)
-    rules = get_rules(engine.IGNORE, engine.ONLY)
-    fixers = get_fixers(engine.IGNORE, engine.ONLY)
+    path    = Path(path)
+    files   = utils.discover_code_files(path)
+    rules   = get_rules(engine.IGNORE, engine.ONLY)
+    fixers  = get_fixers(engine.IGNORE, engine.ONLY)
     changed = 0
 
     for file in files:
@@ -181,7 +179,7 @@ def format_cmd(path: Path | str, diff: bool = False, score: bool = False) -> int
         if engine._is_embedded_vendor(file_str):
             continue
 
-        original = file.read_text(encoding="utf-8")
+        original  = file.read_text(encoding="utf-8")
         formatted = _format_source(original, file_str, rules, fixers)
         if formatted == original:
             continue

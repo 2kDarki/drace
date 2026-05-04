@@ -1,14 +1,27 @@
 from functools import lru_cache
+from pathlib import Path
 import importlib.util
 import site
 import sys
 import os
 
-from drace.utils import Align, find_proot
 from drace.types import Context, Dict, Fix
+from drace.utils import Align, find_proot
 
 
 GROUPS = ("FUTURE", "STANDARDS", "THIRD_PARTIES", "LOCALS")
+
+
+def _project_modules(proot) -> list[Path]:
+    modules = []
+    for child in Path(proot).iterdir():
+        if child.is_dir():
+            dir = str(child).split(os.sep)[-1]
+            if dir == "__pycache__": continue
+            modules.append(dir)
+            modules.extend(_project_modules(child))
+
+    return modules
 
 
 def _render_darkian_block(grouped_lines: dict[str, list[str]]) -> str:
@@ -17,8 +30,7 @@ def _render_darkian_block(grouped_lines: dict[str, list[str]]) -> str:
 
     for group in GROUPS:
         lines = grouped_lines.get(group, [])
-        if not lines:
-            continue
+        if not lines: continue
         if group == "FUTURE":
             sections.extend(lines)
             sections.append("")
@@ -34,62 +46,56 @@ def _render_darkian_block(grouped_lines: dict[str, list[str]]) -> str:
         sections.extend(lines)
         sections.append("")
 
-    while sections and sections[-1] == "":
-        sections.pop()
+    while sections and sections[-1] == "": sections.pop()
     return "\n".join(sections)
 
 
 def _site_roots() -> set[str]:
     roots = set()
     for getter in (site.getsitepackages, site.getusersitepackages):
-        try:
-            value = getter()
-        except Exception:
-            continue
+        try: value = getter()
+        except Exception: continue
         if isinstance(value, str):
             roots.add(os.path.abspath(value))
-        else:
-            roots |= {os.path.abspath(item) for item in value}
+        else: roots |= {os.path.abspath(item) for item in value}
     return roots
 
 
 @lru_cache(maxsize=2048)
 def _classify_import(name: str, project_root: str) -> str:
-    if name == "__future__":
-        return "FUTURE"
-    if name.startswith("."):
-        return "LOCALS"
-    if not name:
-        return "LOCALS"
+    if name == "__future__": return "FUTURE"
+    if name.startswith("."): return "LOCALS"
+    if not name: return "LOCALS"
 
-    try:
-        spec = importlib.util.find_spec(name.split(".", 1)[0])
-    except Exception:
-        spec = None
+    try: spec = importlib.util.find_spec(name.split(".", 1)[0])
+    except Exception: spec = None
 
-    if spec is None:
-        return "LOCALS"
+    if spec is None: return "LOCALS"
 
     origin = getattr(spec, "origin", None)
-    if origin in (None, "built-in", "frozen"):
-        return "STANDARDS"
+    if origin in ("built-in", "frozen"): return "STANDARDS"
 
-    origin = os.path.abspath(origin)
+    if origin is None:
+        if "." in name: name = name.split(".")[0]
+        if name in _project_modules(project_root):
+            return "LOCALS"
+        return "THIRD_PARTIES"
+
+    origin       = os.path.abspath(origin)
     origin_lower = origin.lower()
-    proot = project_root.lower()
+    proot        = project_root.lower()
 
-    if origin_lower.startswith(proot):
-        return "LOCALS"
+    if origin_lower.startswith(proot): return "LOCALS"
 
     for root in _site_roots():
         if origin_lower.startswith(root.lower()):
             return "THIRD_PARTIES"
 
     stdlib = os.path.abspath(sys.base_prefix).lower()
-    if origin_lower.startswith(stdlib):
-        return "STANDARDS"
+    if origin_lower.startswith(stdlib): return "STANDARDS"
 
-    return "LOCALS"
+    return "LOCALS" if name in _project_modules(project_root) \
+      else "THIRD_PARTIES"
 
 
 def _module_name_from_import(stmt: str) -> str:

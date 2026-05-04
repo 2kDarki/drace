@@ -53,10 +53,17 @@ Drace accepts flexible separators for assignment style:
 - `:`
 - `::`
 
-Example:
+Example (these all do the same thing):
 
 ```bash
+drace config line_len 100
+drace config line_len=100
+drace config line_len:100
+drace config line_len::100
 drace config line_len = 100
+drace config line_len : 100
+drace config line_len =============== 100
+drace config line_len ::::::::::::::::::::::::: 100
 ```
 
 ## Interactive mode

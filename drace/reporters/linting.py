@@ -3,8 +3,17 @@ import time
 import os
 
 from tuikit.textools import pathit, visual_width
-from drace.constants import BAD, MODE, SEP, SPEED, WHITE, WRAP, YELLOW
+
 from drace.linter import engine
+from drace.constants import (
+    BAD,
+    MODE,
+    SEP,
+    SPEED,
+    WHITE,
+    WRAP,
+    YELLOW
+)
 from drace.utils import (
     color,
     format_order,
@@ -64,7 +73,7 @@ def lint_cmd(path: str, score: bool, first: bool,
             text   = f"{prefix}{msg}"
             indent = visual_width(prefix) if WRAP else 0
             print(wrap_text(text, indent))
-            if code == "Z101": print(f"\n#{rest}\n")
+            if code == "Z101": print(f"{rest}\n")
             time.sleep(SPEED)
 
     if score or cmd == "score":

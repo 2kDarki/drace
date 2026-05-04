@@ -25,8 +25,7 @@ Supported operations:
 
 2. `replace_block`
 - Required fields: `start`, `end`, `content`
-- Semantics: replace inclusive 1-based line range `[start, end]` with a list
-  of strings
+- Semantics: replace inclusive 1-based line range `[start, end]` with a list of strings
 
 ## Validation rules
 
@@ -43,7 +42,7 @@ Invalid or incomplete fix payloads are ignored safely. Examples:
 Use either pattern:
 
 1. Inline fix in lint finding:
-```python
+```json
 {
     "file": file,
     "line": 10,

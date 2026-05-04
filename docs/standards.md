@@ -21,8 +21,6 @@ They exist to create predictable visual structure and reduce scanning effort.
 
 ## Practical interpretation
 
-Darkian Standards are not "always-right" style law. They are defaults designed
-for maintainability and scan speed. If your team has context-specific needs,
-configure Drace and keep the standards consistent within that context.
+Darkian Standards are not "always-right" style law. They are defaults designed for maintainability and scan speed. If your team has context-specific needs, configure Drace and keep the standards consistent within that context.
 
 These standards are configurable but form the baseline expectations of the tool.

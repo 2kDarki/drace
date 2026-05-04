@@ -3,7 +3,7 @@ import ast
 from drace.types import Context, Dict, Fix
 
 
-MIN_GROUP = 4
+MIN_GROUP = 2
 
 
 def _is_control_scope(node: ast.AST) -> bool:
@@ -27,15 +27,9 @@ def _is_top_level_assignment(node: ast.AST) -> bool:
         return False
     if not hasattr(node, "lineno") or not hasattr(node, "end_lineno"):
         return False
-    if node.lineno != node.end_lineno:
-        return False
+    if node.lineno != node.end_lineno: return False
 
-    parent = getattr(node, "parent", None)
-    if isinstance(parent, ast.Module):
-        return True
-    if _is_control_scope(parent):
-        return False
-    return False
+    return True
 
 
 def _first_target(node: ast.Assign | ast.AnnAssign) -> ast.AST | None:
@@ -59,13 +53,10 @@ def _assignment_eq_col(node: ast.Assign | ast.AnnAssign, line: str) -> int | Non
 
     # Look for the first standalone '=' after target/annotation.
     idx = line.find("=", start)
-    if idx == -1:
-        return None
+    if idx == -1: return None
     # Exclude "==" and walrus.
-    if idx > 0 and line[idx - 1] in ("=", ":"):
-        return None
-    if idx + 1 < len(line) and line[idx + 1] == "=":
-        return None
+    if idx > 0 and line[idx - 1] in ("=", ":"): return None
+    if idx + 1 < len(line) and line[idx + 1] == "=": return None
     return idx
 
 
@@ -81,43 +72,39 @@ def _group_assignments(
     prev_indent = None
 
     for node in sorted(nodes, key=lambda n: (n.lineno, n.col_offset)):
-        if prev_lineno is None:
-            current = [node]
+        if prev_lineno is None: current = [node]
         else:
             contiguous = node.lineno == prev_lineno + 1
             same_indent = node.col_offset == prev_indent
-            if contiguous and same_indent:
-                current.append(node)
+            if contiguous and same_indent: current.append(node)
             else:
-                if current:
-                    groups.append(current)
+                if current: groups.append(current)
                 current = [node]
 
         prev_lineno = node.lineno
         prev_indent = node.col_offset
 
-    if current:
-        groups.append(current)
+    if current: groups.append(current)
     return groups
 
 
 def _render_aligned_line(line: str, current_col: int, target_col: int) -> str:
     if current_col == target_col:
         if current_col + 1 < len(line) and line[current_col + 1] != " ":
-            left = line[: current_col + 1]
-            right = line[current_col + 1 :].lstrip()
+            left  = line[:current_col + 1]
+            right = line[current_col + 1:].lstrip()
             return f"{left} {right}"
         return line
 
-    left = line[:current_col].rstrip()
-    right = line[current_col + 1 :].lstrip()
+    left    = line[:current_col].rstrip()
+    right   = line[current_col + 1:].lstrip()
     padding = max(target_col - len(left), 1)
     return f"{left}{' ' * padding}= {right}"
 
 
 def fixes_z100(context: Context) -> list[Fix]:
     lines = context["lines"]
-    tree = context["tree"]
+    tree  = context["tree"]
     fixes: list[Fix] = []
 
     candidates: list[ast.Assign | ast.AnnAssign] = [
@@ -126,8 +113,7 @@ def fixes_z100(context: Context) -> list[Fix]:
     ]
 
     for group in _group_assignments(candidates):
-        if len(group) < MIN_GROUP:
-            continue
+        if len(group) < MIN_GROUP: continue
 
         eq_positions: dict[int, int] = {}
         for node in group:
@@ -136,15 +122,14 @@ def fixes_z100(context: Context) -> list[Fix]:
             if eq_col is not None:
                 eq_positions[node.lineno] = eq_col
 
-        if len(eq_positions) < 2:
-            continue
+        if len(eq_positions) < 2: continue
 
         target_col = max(eq_positions.values())
         if not any(col != target_col for col in eq_positions.values()):
             continue
 
         for lineno, col in eq_positions.items():
-            line = lines[lineno - 1]
+            line  = lines[lineno - 1]
             fixed = _render_aligned_line(line, col, target_col)
             if fixed != line:
                 fixes.append({
@@ -162,8 +147,8 @@ def check_z100(context: Context) -> list[Dict]:
           assignment blocks.
     """
     lines = context["lines"]
-    tree = context["tree"]
-    file = context["file"]
+    tree  = context["tree"]
+    file  = context["file"]
     results: list[Dict] = []
     fixes_by_line = {
         int(fix["line"]): fix
@@ -177,17 +162,15 @@ def check_z100(context: Context) -> list[Dict]:
     ]
 
     for group in _group_assignments(candidates):
-        if len(group) < MIN_GROUP:
-            continue
+        if len(group) < MIN_GROUP: continue
         eq_positions: dict[int, int] = {}
         for node in group:
-            line = lines[node.lineno - 1]
+            line   = lines[node.lineno - 1]
             eq_col = _assignment_eq_col(node, line)
             if eq_col is not None:
                 eq_positions[node.lineno] = eq_col
 
-        if len(eq_positions) < 2:
-            continue
+        if len(eq_positions) < 2: continue
 
         target_col = max(eq_positions.values())
         for lineno, col in eq_positions.items():
